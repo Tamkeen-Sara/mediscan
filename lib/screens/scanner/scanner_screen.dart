@@ -1,8 +1,12 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
+import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
+import '../../providers/preferences_provider.dart';
+import '../../providers/scan_provider.dart';
 import '../../services/translation_service.dart';
 import '../../widgets/scan_overlay_painter.dart';
 
@@ -43,6 +47,7 @@ class _ScannerScreenState extends State<ScannerScreen>
         // pressure than high (1280×720) which caused cascading buffer drops.
         ResolutionPreset.medium,
         enableAudio: false,
+        // jpeg = best for Android; takePicture() always returns JPEG regardless.
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
       await ctrl.initialize();
@@ -50,20 +55,16 @@ class _ScannerScreenState extends State<ScannerScreen>
         await ctrl.dispose();
         return;
       }
-      // Listen for async camera errors (e.g. hardware onError after init)
       ctrl.addListener(_onCameraValue);
       setState(() {
         _camCtrl = ctrl;
         _camReady = true;
       });
-    } catch (_) {
-      // Camera unavailable — fall back to black background + image_picker
-    }
+    } catch (_) {}
   }
 
   void _onCameraValue() {
     if (_camCtrl != null && _camCtrl!.value.hasError) {
-      // Camera hardware error — release and fall back to image_picker
       final ctrl = _camCtrl;
       setState(() {
         _camCtrl = null;
@@ -73,8 +74,6 @@ class _ScannerScreenState extends State<ScannerScreen>
     }
   }
 
-  /// Releases the camera BEFORE navigating so it doesn't keep running
-  /// throughout the OCR + Gemini pipeline (was causing onError in logs).
   Future<void> _releaseCamera() async {
     final ctrl = _camCtrl;
     if (ctrl != null) {
@@ -98,44 +97,150 @@ class _ScannerScreenState extends State<ScannerScreen>
     if (_capturing) return;
     setState(() => _capturing = true);
 
-    // Capture directly from controller if available
     if (_camReady && _camCtrl != null) {
       try {
         final file = await _camCtrl!.takePicture();
-        await _releaseCamera(); // Free camera BEFORE pushing processing screen
+        await _releaseCamera();
         if (!mounted) return;
-        Navigator.pushNamed(context, '/processing', arguments: file.path);
+        await Navigator.pushNamed(context, '/processing', arguments: file.path);
+        if (mounted) {
+          setState(() => _capturing = false);
+          _initCamera();
+        }
         return;
       } catch (_) {
-        // Hardware error — release and fall through to image_picker
         await _releaseCamera();
       }
     }
 
-    // Fallback: open system camera via image_picker
     final picker = ImagePicker();
     final file = await picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 90,
     );
-    if (mounted) setState(() => _capturing = false);
-    if (file == null || !mounted) return;
-    Navigator.pushNamed(context, '/processing', arguments: file.path);
+    if (file == null) {
+      if (mounted) {
+        setState(() => _capturing = false);
+        _initCamera();
+      }
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.pushNamed(context, '/processing', arguments: file.path);
+    if (mounted) {
+      setState(() => _capturing = false);
+      _initCamera();
+    }
+  }
+
+  Future<void> _showManualEntry(BuildContext ctx) async {
+    final scanProvider = ctx.read<ScanProvider>();
+    final autoSummarise = ctx.read<PreferencesProvider>().autoSummarise;
+    final navigator = Navigator.of(ctx);
+
+    final controller = TextEditingController();
+    final result = await showModalBottomSheet<String>(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(sheetCtx).viewInsets.bottom,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(sheetCtx).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(AppDimensions.radiusXL)),
+          ),
+          padding: const EdgeInsets.fromLTRB(
+              AppDimensions.pagePadding,
+              AppDimensions.spaceMD,
+              AppDimensions.pagePadding,
+              AppDimensions.spaceLG),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(sheetCtx).dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.spaceMD),
+              Text(
+                TranslationService.instance.tr(AppStrings.scannerTitle),
+                style: Theme.of(sheetCtx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: AppDimensions.spaceXS),
+              Text(
+                'Type the medicine name or text from the packet',
+                style: Theme.of(sheetCtx).textTheme.bodySmall,
+              ),
+              const SizedBox(height: AppDimensions.spaceMD),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                maxLines: 3,
+                minLines: 1,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. Panadol 500mg, Augmentin, Metformin…',
+                  prefixIcon: Icon(Icons.medication_outlined),
+                ),
+                onSubmitted: (v) => Navigator.pop(sheetCtx, v.trim()),
+              ),
+              const SizedBox(height: AppDimensions.spaceMD),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.search),
+                  label: const Text('Find Medicine'),
+                  onPressed: () =>
+                      Navigator.pop(sheetCtx, controller.text.trim()),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    controller.dispose();
+
+    if (result == null || result.isEmpty || !mounted) return;
+    scanProvider.processManualText(result, autoSummarise: autoSummarise);
+    navigator.pushNamed('/processing');
   }
 
   Future<void> _pickFromGallery() async {
     if (_capturing) return;
     setState(() => _capturing = true);
 
-    await _releaseCamera(); // Release camera while gallery picker is open
+    await _releaseCamera();
     final picker = ImagePicker();
     final file = await picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 90,
     );
-    if (mounted) setState(() => _capturing = false);
-    if (file == null || !mounted) return;
-    Navigator.pushNamed(context, '/processing', arguments: file.path);
+    if (file == null) {
+      if (mounted) {
+        setState(() => _capturing = false);
+        _initCamera();
+      }
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.pushNamed(context, '/processing', arguments: file.path);
+    if (mounted) {
+      setState(() => _capturing = false);
+      _initCamera();
+    }
   }
 
   @override
@@ -151,55 +256,60 @@ class _ScannerScreenState extends State<ScannerScreen>
             style: const TextStyle(color: AppColors.white)),
         iconTheme: const IconThemeData(color: AppColors.white),
       ),
-      body: Stack(
-        fit: StackFit.expand,
+      body: Column(
         children: [
-          // Live camera preview or black fallback
-          if (_camReady && _camCtrl != null)
-            ClipRect(child: CameraPreview(_camCtrl!))
-          else
-            Container(color: AppColors.black),
+          // ── Camera viewport ──────────────────────────────────────────────
+          Expanded(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (_camReady && _camCtrl != null)
+                  ClipRect(child: CameraPreview(_camCtrl!))
+                else
+                  Container(color: AppColors.black),
 
-          // Animated corner brackets overlay
-          AnimatedBuilder(
-            animation: _pulse,
-            builder: (_, __) => CustomPaint(
-              painter: ScanOverlayPainter(animationValue: _pulse.value),
-              child: const SizedBox.expand(),
+                AnimatedBuilder(
+                  animation: _pulse,
+                  builder: (_, __) => CustomPaint(
+                    painter: ScanOverlayPainter(animationValue: _pulse.value),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+
+                // Hint text
+                Positioned(
+                  bottom: 80,
+                  left: 0,
+                  right: 0,
+                  child: Text(
+                    tr(AppStrings.scannerHint),
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(color: AppColors.white, fontSize: 14),
+                  ),
+                ),
+
+                // Tip text
+                Positioned(
+                  bottom: 56,
+                  left: 0,
+                  right: 0,
+                  child: Text(
+                    tr(AppStrings.scanTip),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: AppColors.white.withValues(alpha: 0.6),
+                        fontSize: 12),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // Hint text
-          Positioned(
-            bottom: 200,
-            left: 0,
-            right: 0,
-            child: Text(
-              tr(AppStrings.scannerHint),
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.white, fontSize: 14),
-            ),
-          ),
-
-          // Tip below hint
-          Positioned(
-            bottom: 175,
-            left: 0,
-            right: 0,
-            child: Text(
-              tr(AppStrings.scanTip),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  color: AppColors.white.withValues(alpha: 0.6),
-                  fontSize: 12),
-            ),
-          ),
-
-          // Bottom controls: gallery | camera shutter | (spacer)
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
+          // ── Bottom controls ──────────────────────────────────────────────
+          Container(
+            color: AppColors.black,
+            padding: const EdgeInsets.symmetric(vertical: 20),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -210,7 +320,7 @@ class _ScannerScreenState extends State<ScannerScreen>
                   onPressed: _capturing ? null : _pickFromGallery,
                 ),
 
-                // Camera shutter button
+                // Shutter
                 GestureDetector(
                   onTap: _capturing ? null : _takePhoto,
                   child: Container(
@@ -218,7 +328,8 @@ class _ScannerScreenState extends State<ScannerScreen>
                     height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.white, width: 3),
+                      border:
+                          Border.all(color: AppColors.white, width: 3),
                       color: _capturing
                           ? AppColors.white.withValues(alpha: 0.05)
                           : AppColors.white.withValues(alpha: 0.15),
@@ -238,8 +349,94 @@ class _ScannerScreenState extends State<ScannerScreen>
                   ),
                 ),
 
-                const SizedBox(width: 80),
+                _ControlButton(
+                  icon: Icons.keyboard_outlined,
+                  label: 'Type',
+                  isDark: isDark,
+                  onPressed: _capturing
+                      ? null
+                      : () => _showManualEntry(context),
+                ),
               ],
+            ),
+          ),
+
+          // ── "What Do I Have?" symptom checker entry card ─────────────────
+          Container(
+            color: isDark ? AppColors.surfaceDark : AppColors.backgroundLight,
+            padding: const EdgeInsets.fromLTRB(
+                AppDimensions.pagePadding, 0,
+                AppDimensions.pagePadding, AppDimensions.spaceMD),
+            child: InkWell(
+              onTap: () => Navigator.pushNamed(context, '/symptom-checker'),
+              borderRadius:
+                  BorderRadius.circular(AppDimensions.radiusMD),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppDimensions.spaceMD,
+                    vertical: AppDimensions.spaceSM + 2),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? AppColors.surfaceElevatedDark
+                      : AppColors.surfaceLight,
+                  borderRadius:
+                      BorderRadius.circular(AppDimensions.radiusMD),
+                  border: const Border(
+                    left: BorderSide(
+                        color: AppColors.chipGreen, width: 4),
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColors.shadowLight,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tr(AppStrings.whatDoIHave),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            tr(AppStrings.pointAtMedicine),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppDimensions.spaceSM),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.chipGreen.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.health_and_safety_outlined,
+                        color: AppColors.chipGreen,
+                        size: 26,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -269,8 +466,6 @@ class _ControlButton extends StatelessWidget {
             isDark ? AppColors.surfaceElevatedDark : AppColors.surfaceLight,
         foregroundColor: AppColors.primaryBlue,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        // Override global theme's Size(double.infinity, 48) which causes
-        // BoxConstraints crash when this button is inside a Row.
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
