@@ -7,8 +7,8 @@ import '../services/ocr_service.dart';
 import '../services/medicine_identifier.dart';
 import '../services/gemini_service.dart';
 import '../services/realtime_db_service.dart';
+import '../utils/app_logger.dart';
 
-/// Processing phase for the scan pipeline — distinct from ScanStatus in the model.
 enum ScanPhase { idle, processing, result, failed }
 
 class ScanProvider extends ChangeNotifier {
@@ -39,6 +39,8 @@ class ScanProvider extends ChangeNotifier {
       _result?.medicine.summaryEn ??
       '';
 
+  // ─────────────── Camera / image scan ──────────────────────────────────────
+
   Future<void> processImage(String imagePath,
       {bool autoSummarise = true}) async {
     _imagePath = imagePath;
@@ -49,59 +51,96 @@ class ScanProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Step 1: OCR
       _processingStep = 'extracting_text';
       notifyListeners();
       final rawText = await OcrService.instance.extractText(imagePath);
       final tokens = OcrService.instance.extractTokens(rawText);
-
-      // Step 2: Identify
-      _processingStep = 'identifying_medicine';
-      notifyListeners();
-      final identResult = await MedicineIdentifier.instance.identify(
-        rawOcrText: rawText,
-        tokens: tokens,
-      );
-
-      if (identResult.isFailed) {
-        _phase = ScanPhase.failed;
-        notifyListeners();
-        return;
-      }
-
-      _result = identResult;
-
-      // Step 3: Gemini summary — best-effort, never blocks the pipeline
-      if (autoSummarise) {
-        _processingStep = 'generating_summary';
-        notifyListeners();
-        try {
-          _summaryResult = await GeminiService.instance
-              .generateMedicineSummary(identResult.medicine);
-        } catch (_) {
-          // Gemini failed — continue without summary, results still show
-        }
-      }
-
-      // Step 4: Save to history
-      _processingStep = 'almost_done';
-      notifyListeners();
-      await _saveToHistory(identResult);
-
-      _phase = ScanPhase.result;
-      notifyListeners();
-    } catch (_) {
-      // Any unhandled exception (network, Firebase, etc.) → show scan-failed
+      await _runPipeline(rawText: rawText, tokens: tokens,
+          autoSummarise: autoSummarise);
+    } catch (e, st) {
+      AppLogger.error('Image scan pipeline failed', error: e, stackTrace: st);
       _phase = ScanPhase.failed;
       notifyListeners();
     }
   }
 
+  // ─────────────── Manual text entry scan ───────────────────────────────────
+
+  /// Process text the user typed manually (medicine name or packet text).
+  /// Skips OCR — feeds the text directly into the identification pipeline.
+  Future<void> processManualText(String text,
+      {bool autoSummarise = true}) async {
+    final cleaned = text.trim();
+    if (cleaned.isEmpty) return;
+
+    _imagePath = null;
+    _phase = ScanPhase.processing;
+    _result = null;
+    _summaryResult = null;
+    _isSaved = false;
+    notifyListeners();
+
+    try {
+      // Skip extracting_text step — user already provided the text
+      _processingStep = 'identifying_medicine';
+      notifyListeners();
+      final tokens = OcrService.instance.extractTokens(cleaned);
+      await _runPipeline(rawText: cleaned, tokens: tokens,
+          autoSummarise: autoSummarise);
+    } catch (e, st) {
+      AppLogger.error('Manual text scan failed', error: e, stackTrace: st);
+      _phase = ScanPhase.failed;
+      notifyListeners();
+    }
+  }
+
+  // ─────────────── Shared pipeline (after OCR) ──────────────────────────────
+
+  Future<void> _runPipeline({
+    required String rawText,
+    required List<String> tokens,
+    bool autoSummarise = true,
+  }) async {
+    _processingStep = 'identifying_medicine';
+    notifyListeners();
+    final identResult = await MedicineIdentifier.instance.identify(
+      rawOcrText: rawText,
+      tokens: tokens,
+    );
+
+    if (identResult.isFailed) {
+      _phase = ScanPhase.failed;
+      notifyListeners();
+      return;
+    }
+
+    _result = identResult;
+
+    if (autoSummarise) {
+      _processingStep = 'generating_summary';
+      notifyListeners();
+      try {
+        _summaryResult = await GeminiService.instance
+            .generateMedicineSummary(identResult.medicine);
+      } catch (e) {
+        AppLogger.warning('Gemini summary skipped', error: e);
+      }
+    }
+
+    _processingStep = 'almost_done';
+    notifyListeners();
+    await _saveToHistory(identResult);
+
+    _phase = ScanPhase.result;
+    notifyListeners();
+  }
+
+  // ─────────────── History ──────────────────────────────────────────────────
+
   Future<void> _saveToHistory(IdentificationResult identResult) async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
-
       final historyItem = ScanHistoryModel(
         id: '',
         medicineId: identResult.medicine.id,
@@ -113,8 +152,12 @@ class ScanProvider extends ChangeNotifier {
         scannedAt: DateTime.now(),
       );
       await RealtimeDatabaseService.instance.saveToHistory(uid, historyItem);
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.warning('Save to history failed', error: e);
+    }
   }
+
+  // ─────────────── Saved medicines ──────────────────────────────────────────
 
   Future<void> saveCurrentMedicine() async {
     if (_result == null) return;
@@ -125,10 +168,13 @@ class ScanProvider extends ChangeNotifier {
           .saveMedicine(uid, _result!.medicine);
       _isSaved = true;
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.warning('Save medicine failed', error: e);
+    }
   }
 
-  /// Used by history screen when full medicine data isn't in local cache.
+  // ─────────────── Manual / history modes ───────────────────────────────────
+
   void setManualMedicineFromHistory(ScanHistoryModel history) {
     final medicine = MedicineModel(
       id: history.medicineId.isNotEmpty
@@ -141,7 +187,6 @@ class ScanProvider extends ChangeNotifier {
     setManualMedicine(medicine);
   }
 
-  /// Used by manual edit screen or info mode (Addendum 2).
   void setManualMedicine(MedicineModel medicine) {
     _result = IdentificationResult(
       medicine: medicine,

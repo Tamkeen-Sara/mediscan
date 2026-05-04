@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/medicine_model.dart';
 import '../models/chat_message.dart';
+import '../utils/app_logger.dart';
 import 'realtime_db_service.dart';
 import 'translate_service.dart';
+
+const Duration _kGeminiTimeout = Duration(seconds: 30);
 
 class GeminiSummaryResult {
   final String summaryEn;
@@ -95,37 +99,50 @@ class GeminiService {
     if (!isAvailable) return null;
 
     final prompt = '''
-You are a medical information assistant helping Pakistani patients understand their medicines.
+You are a friendly pharmacist explaining medicine to a Pakistani person who has limited medical knowledge.
+Always use simple everyday language. Never use medical jargon.
+If you must use a medical term, immediately explain it in brackets.
+Example: "ibuprofen (a medicine that reduces pain and swelling)"
+Always be reassuring but honest. If something is dangerous, say so clearly but kindly.
+Never say "consult your doctor" as the ONLY answer — always give useful information first.
 
 Medicine: ${medicine.displayName}
 Generic name: ${medicine.genericName}
 Category: ${medicine.category}
 Used for: ${medicine.symptomsPlain.join(', ')}
 Dosage info: ${medicine.dosageAdults}
-Key warnings: ${medicine.warningsPlain}
+Key warnings: ${medicine.warningsPlain.join('; ')}
 
-Please respond in valid JSON only, with exactly this structure:
+Task 1 — Write a plain-language summary in English:
+- 3 to 4 sentences
+- Use words a 12-year-old would understand
+- Cover: what this medicine is, what problem it solves, who would need it
+
+Task 2 — Write the same summary in Urdu (summaryUr).
+
+Task 3 — Generate 3 questions a Pakistani person would most want to ask about this medicine.
+These should be questions someone asks when they find an old medicine at home.
+Simple, conversational, in English.
+
+Return ONLY valid JSON:
 {
-  "summaryEn": "A 2-3 sentence plain English explanation of what this medicine does and when to use it, written for a patient with no medical background.",
-  "summaryUr": "وہی خلاصہ اردو میں، سادہ زبان میں۔",
-  "suggestedQuestions": [
-    "First follow-up question a patient might ask",
-    "Second follow-up question",
-    "Third follow-up question"
-  ]
+  "summaryEn": "...",
+  "summaryUr": "...",
+  "suggestedQuestions": ["q1", "q2", "q3"]
 }
-
-Do not include any text outside the JSON object.
+No markdown, no explanation, no extra text.
 ''';
 
     try {
-      final response =
-          await _model!.generateContent([Content.text(prompt)]);
+      final response = await _model!
+          .generateContent([Content.text(prompt)])
+          .timeout(_kGeminiTimeout,
+              onTimeout: () => throw TimeoutException('Summary timed out'));
       final text = response.text ?? '';
       var result = _parseSummaryJson(text);
       if (result == null) return null;
 
-      // Translate to Urdu if Gemini didn't produce one and the key is available
+      // Translate to Urdu if Gemini didn't produce one
       if (result.summaryUr.isEmpty && result.summaryEn.isNotEmpty) {
         final translated = await TranslateService.instance
             .translate(result.summaryEn, source: 'en', target: 'ur');
@@ -149,8 +166,9 @@ Do not include any text outside the JSON object.
       }
       lastError = null;
       return result;
-    } catch (e) {
+    } catch (e, st) {
       lastError = _classifyError(e);
+      AppLogger.error('Gemini summary failed', error: e, stackTrace: st);
       return null;
     }
   }
@@ -188,19 +206,23 @@ Do not include any text outside the JSON object.
     required List<ChatMessage> history,
     required String userMessage,
     MedicineModel? context,
+    String languageCode = 'en',
   }) async {
     if (!isAvailable) return null;
 
     try {
       final chat = _model!.startChat(
-        history: _buildHistory(history, context),
+        history: _buildHistory(history, context, languageCode),
       );
-      final response =
-          await chat.sendMessage(Content.text(userMessage));
+      final response = await chat
+          .sendMessage(Content.text(userMessage))
+          .timeout(_kGeminiTimeout,
+              onTimeout: () => throw TimeoutException('Chat timed out'));
       lastError = null;
       return response.text;
-    } catch (e) {
+    } catch (e, st) {
       lastError = _classifyError(e);
+      AppLogger.error('Gemini chat failed', error: e, stackTrace: st);
       switch (lastError) {
         case GeminiError.rateLimited:
           return '__rate_limit__';
@@ -215,31 +237,55 @@ Do not include any text outside the JSON object.
   }
 
   List<Content> _buildHistory(
-      List<ChatMessage> messages, MedicineModel? context) {
+      List<ChatMessage> messages, MedicineModel? context, String languageCode) {
     final contents = <Content>[];
+    final isUrdu = languageCode == 'ur';
 
     if (context != null) {
-      final systemText = '''
-You are MediScan AI, a helpful medical information assistant for Pakistani patients.
+      final systemText = isUrdu
+          ? '''
+آپ ایک دوستانہ فارماسسٹ ہیں جو محدود طبی معلومات رکھنے والے پاکستانی شخص کو دوائی سمجھا رہے ہیں۔
+ہمیشہ سادہ روزمرہ کی زبان استعمال کریں۔ طبی اصطلاحات سے گریز کریں۔
+آپ اس دوائی کے بارے میں سوالات کا جواب دے رہے ہیں: ${context.displayName} (${context.genericName})۔
+خلاصہ: ${context.cachedSummaryUr ?? context.cachedSummaryEn ?? context.summaryEn}
+خوراک: ${context.dosageAdults}
+احتیاطیں: ${context.warningsPlain.join('؛ ')}
+ہمیشہ اردو میں جواب دیں۔ صرف "ڈاکٹر سے ملیں" نہ کہیں — پہلے مفید معلومات دیں۔
+'''
+          : '''
+You are a friendly pharmacist explaining medicine to a Pakistani person with limited medical knowledge.
+Always use simple everyday language. Never use medical jargon.
+If you must use a medical term, immediately explain it in brackets.
+Always be reassuring but honest. Keep answers under 150 words unless more is needed.
+Never say "consult your doctor" as the ONLY answer — always give useful information first.
+Respond in English.
+
 You are answering questions about: ${context.displayName} (${context.genericName}).
 Summary: ${context.cachedSummaryEn ?? context.summaryEn}
 Dosage: ${context.dosageAdults}
-Warnings: ${context.warningsPlain}
-Always recommend consulting a doctor for personal medical advice.
+Warnings: ${context.warningsPlain.join('; ')}
 ''';
       contents.add(Content.text(systemText));
       contents.add(Content.model([
-        TextPart(
-            'Understood. I am ready to answer questions about ${context.displayName}. How can I help?')
+        TextPart(isUrdu
+            ? '${context.displayName} کے بارے میں آپ کے سوالات کا جواب دینے کے لیے تیار ہوں۔ کیا مدد کر سکتا ہوں؟'
+            : 'Understood. I am ready to answer questions about ${context.displayName}. How can I help?')
       ]));
     } else {
-      contents.add(Content.text(
-          'You are MediScan AI, a helpful medical information assistant for Pakistani patients. '
-          'Answer questions about medicines, dosage, interactions, and safety. '
-          'Always recommend consulting a doctor for personal medical advice.'));
+      final systemText = isUrdu
+          ? 'آپ ایک دوستانہ فارماسسٹ ہیں جو پاکستانی مریضوں کو دوائیوں کے بارے میں سادہ زبان میں بتا رہے ہیں۔ طبی اصطلاحات سے گریز کریں۔ اگر کوئی علامات بیان کرے تو 2-3 عام OTC دوائیاں بتائیں جو پاکستان میں دستیاب ہوں۔ ہمیشہ اردو میں جواب دیں۔'
+          : 'You are a friendly pharmacist explaining medicines to Pakistani patients with limited medical knowledge. '
+              'Use simple everyday language. Never use medical jargon without explaining it. '
+              'If someone describes symptoms, suggest 2-3 common OTC medicines available in Pakistan that help, '
+              'giving brand name, what it does, and usual dose. '
+              'End symptom answers with: "You can also use the Symptom Checker in the Scanner tab to search your saved medicines." '
+              'Keep answers under 150 words unless more is needed. '
+              'Never say "consult your doctor" as the ONLY answer — give useful information first.';
+      contents.add(Content.text(systemText));
       contents.add(Content.model([
-        TextPart(
-            'Hello! I am MediScan AI. How can I help you with your medicine questions today?')
+        TextPart(isUrdu
+            ? 'السلام علیکم! میں MediScan AI ہوں۔ آج آپ کی دواؤں کے بارے میں کیا مدد کر سکتا ہوں؟'
+            : 'Hello! I am MediScan AI. How can I help you with your medicine questions today?')
       ]));
     }
 

@@ -16,20 +16,60 @@ class ChatProvider extends ChangeNotifier {
   bool get isTyping => _isTyping;
   bool get hasContext => _contextMedicine != null;
 
-  /// Called when navigating to chat from a scan result.
+  /// Called when opening chat from a scan result.
+  /// Always starts fresh — clears any previous conversation so one medicine's
+  /// history never bleeds into a different medicine's chat session.
   void initWithContext(MedicineModel medicine, {String languageCode = 'en'}) {
     _contextMedicine = medicine;
-    if (_messages.isEmpty) {
-      final briefing = languageCode == 'ur'
-          ? 'آپ کی دوائی ${medicine.displayName} کے بارے میں معلومات لوڈ ہے۔ آپ کوئی بھی سوال پوچھ سکتے ہیں۔'
-          : 'I have your medicine information loaded. Here is a quick summary, and feel free to ask me anything about it.';
-      _messages.add(ChatMessage.bot(text: briefing));
-      notifyListeners();
+    _messages.clear();
+    _isOffline = false;
+    _isTyping = false;
+
+    final isUr = languageCode == 'ur';
+
+    // Message 1 — Identity
+    final identityParts = <String>[];
+    if (isUr) {
+      identityParts.add('**${medicine.displayName}**');
+      if (medicine.genericName.isNotEmpty && medicine.genericName != medicine.displayName) {
+        identityParts.add('(${medicine.genericName})');
+      }
+      if (medicine.category.isNotEmpty) identityParts.add('— ${medicine.category}');
+      if (medicine.manufacturer.isNotEmpty) identityParts.add('by ${medicine.manufacturer}');
+    } else {
+      identityParts.add('**${medicine.displayName}**');
+      if (medicine.genericName.isNotEmpty && medicine.genericName != medicine.displayName) {
+        identityParts.add('(${medicine.genericName})');
+      }
+      if (medicine.category.isNotEmpty) identityParts.add('— ${medicine.category}');
+      if (medicine.manufacturer.isNotEmpty) identityParts.add('by ${medicine.manufacturer}');
     }
+    _messages.add(ChatMessage.bot(text: identityParts.join(' ')));
+
+    // Message 2 — Summary (only if one is cached)
+    final summary = isUr
+        ? (medicine.summaryUr.isNotEmpty ? medicine.summaryUr : medicine.cachedSummaryUr)
+        : (medicine.summaryEn.isNotEmpty ? medicine.summaryEn : medicine.cachedSummaryEn);
+    if (summary != null && summary.isNotEmpty) {
+      _messages.add(ChatMessage.bot(text: summary));
+    }
+
+    // Message 3 — Call to action
+    _messages.add(ChatMessage.bot(
+      text: isUr
+          ? 'آپ نیچے دی گئی تجاویز میں سے کوئی بھی سوال تھپتھپائیں، یا اپنا سوال ٹائپ کریں۔'
+          : 'Tap a suggested question below, or ask me anything about ${medicine.displayName}.',
+    ));
+
+    notifyListeners();
   }
 
+  /// Resets to general assistant mode (no medicine context, blank slate).
   void setGeneralMode() {
     _contextMedicine = null;
+    _messages.clear();
+    _isOffline = false;
+    _isTyping = false;
     notifyListeners();
   }
 
@@ -50,10 +90,7 @@ class ChatProvider extends ChangeNotifier {
     bool usedGemini = false;
 
     if (useGemini && GeminiService.instance.isAvailable) {
-      final history = _messages
-          .where((m) => !m.isLoading)
-          .toList();
-      // exclude the user message just added (last item) — chat history is prior turns
+      final history = _messages.where((m) => !m.isLoading).toList();
       final priorHistory =
           history.length > 1 ? history.sublist(0, history.length - 1) : <ChatMessage>[];
 
@@ -61,11 +98,11 @@ class ChatProvider extends ChangeNotifier {
         history: priorHistory,
         userMessage: text,
         context: _contextMedicine,
+        languageCode: languageCode,
       );
       usedGemini = true;
     }
 
-    // Specific error signals from GeminiService
     if (reply == '__rate_limit__') {
       _removeLoading();
       _isTyping = false;
@@ -86,9 +123,8 @@ class ChatProvider extends ChangeNotifier {
       _isOffline = true;
       _messages.add(ChatMessage.bot(
         text: languageCode == 'ur'
-            ? 'AI سے رابطہ ناکام: API key غلط ہے یا Gemini API فعال نہیں۔ Google AI Studio میں key چیک کریں۔'
-            : 'AI connection failed: API key is invalid or the Gemini API is not enabled. '
-                'Please check your key at aistudio.google.com.',
+            ? 'AI سے رابطہ ناکام: API key غلط ہے یا Gemini API فعال نہیں۔'
+            : 'AI connection failed: API key is invalid or the Gemini API is not enabled.',
         isTemplateResponse: true,
       ));
       notifyListeners();
@@ -109,7 +145,6 @@ class ChatProvider extends ChangeNotifier {
       return;
     }
 
-    // Gemini returned null — generic failure, fall back to templates
     if (reply == null || reply.isEmpty) {
       _isOffline = usedGemini;
       if (fallbackTemplates) {

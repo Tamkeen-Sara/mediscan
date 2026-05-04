@@ -1,0 +1,24 @@
+{
+  "rules": {
+    "medicines": {
+      ".read": "auth != null",
+      ".indexOn": ["brandName", "genericName", "searchKeywords"],
+      "$medicineId": {
+        ".write": "auth != null"
+      }
+    },
+    "feedback": {
+      ".read": false,
+      ".write": "auth != null"
+    },
+    "users": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "scan_history": {
+          ".indexOn": ["scannedAt", "isFavourite"]
+        }
+      }
+    }
+  }
+}

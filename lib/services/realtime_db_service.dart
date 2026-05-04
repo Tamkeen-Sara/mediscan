@@ -44,19 +44,60 @@ class RealtimeDatabaseService {
   }
 
   Future<List<MedicineModel>> searchMedicines(String query) async {
+    final q = query.trim();
+    if (q.isEmpty) return [];
     try {
-      final snap = await _db.ref('medicines').get();
-      if (!snap.exists || snap.value == null) return [];
-      final outerMap = Map<String, dynamic>.from(snap.value as Map);
-      final q = query.toLowerCase();
-      return outerMap.values
-          .map((v) =>
-              MedicineModel.fromJson(Map<String, dynamic>.from(v as Map)))
-          .where((m) =>
-              m.brandName.toLowerCase().contains(q) ||
-              m.genericName.toLowerCase().contains(q) ||
-              m.searchKeywords.toLowerCase().contains(q))
-          .toList();
+      // Use indexed prefix queries instead of downloading the whole node.
+      // Requires ".indexOn": ["brandName", "genericName"] in DB rules.
+      //
+      // Firebase orderByChild is case-sensitive. OCR tokens are lowercase but
+      // medicine names in the DB are title-case (e.g. "Panadol"). Try both the
+      // raw token and a capitalised version so we match either format.
+      final qCapital =
+          q.isNotEmpty ? q[0].toUpperCase() + q.substring(1) : q;
+
+      const timeout = Duration(seconds: 5);
+
+      for (final key in [qCapital, q]) {
+        final endKey = '$key\uf8ff';
+
+        final brandSnap = await _db
+            .ref('medicines')
+            .orderByChild('brandName')
+            .startAt(key)
+            .endAt(endKey)
+            .limitToFirst(3)
+            .get()
+            .timeout(timeout, onTimeout: () => throw TimeoutException(''));
+
+        if (brandSnap.exists && brandSnap.value != null) {
+          final map = Map<String, dynamic>.from(brandSnap.value as Map);
+          final results = map.values
+              .map((v) =>
+                  MedicineModel.fromJson(Map<String, dynamic>.from(v as Map)))
+              .toList();
+          if (results.isNotEmpty) return results;
+        }
+
+        final genericSnap = await _db
+            .ref('medicines')
+            .orderByChild('genericName')
+            .startAt(key)
+            .endAt(endKey)
+            .limitToFirst(3)
+            .get()
+            .timeout(timeout, onTimeout: () => throw TimeoutException(''));
+
+        if (genericSnap.exists && genericSnap.value != null) {
+          final map = Map<String, dynamic>.from(genericSnap.value as Map);
+          final results = map.values
+              .map((v) =>
+                  MedicineModel.fromJson(Map<String, dynamic>.from(v as Map)))
+              .toList();
+          if (results.isNotEmpty) return results;
+        }
+      }
+      return [];
     } catch (_) {
       return [];
     }
@@ -269,6 +310,21 @@ class RealtimeDatabaseService {
   Future<void> deleteUserData(String uid) async {
     try {
       await _db.ref('users/$uid').remove();
+    } catch (_) {}
+  }
+
+  // ─────────────────────────── Feedback ────────────────────────────
+
+  Future<void> saveFeedback({
+    required String uid,
+    required String message,
+  }) async {
+    try {
+      await _db.ref('feedback').push().set({
+        'uid': uid,
+        'message': message,
+        'sentAt': DateTime.now().millisecondsSinceEpoch,
+      });
     } catch (_) {}
   }
 }

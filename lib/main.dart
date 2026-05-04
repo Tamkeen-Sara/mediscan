@@ -11,6 +11,7 @@ import 'providers/scan_provider.dart';
 import 'providers/history_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/symptom_checker_provider.dart';
+import 'providers/preferences_provider.dart';
 
 import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
@@ -38,9 +39,11 @@ Future<void> main() async {
 
   final themeProvider = ThemeProvider();
   final languageProvider = LanguageProvider();
+  final preferencesProvider = PreferencesProvider();
   await Future.wait([
     themeProvider.loadFromPrefs(),
     languageProvider.loadFromPrefs(),
+    preferencesProvider.loadFromPrefs(),
   ]);
 
   runApp(
@@ -48,6 +51,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider.value(value: themeProvider),
         ChangeNotifierProvider.value(value: languageProvider),
+        ChangeNotifierProvider.value(value: preferencesProvider),
         ChangeNotifierProvider(create: (_) => ScanProvider()),
         ChangeNotifierProvider(create: (_) => HistoryProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
@@ -113,7 +117,8 @@ class MediScanApp extends StatelessWidget {
   Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case '/processing':
-        final path = settings.arguments as String;
+        // imagePath is null for manual-text scans (no camera image).
+        final path = settings.arguments as String?;
         return MaterialPageRoute(
           builder: (_) => ProcessingScreen(imagePath: path),
           settings: settings,
