@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
+import '../../services/realtime_db_service.dart';
 import '../../services/translation_service.dart';
 
 class FeedbackScreen extends StatefulWidget {
@@ -14,6 +16,7 @@ class FeedbackScreen extends StatefulWidget {
 class _FeedbackScreenState extends State<FeedbackScreen> {
   final _ctrl = TextEditingController();
   bool _sent = false;
+  bool _sending = false;
 
   @override
   void dispose() {
@@ -21,10 +24,21 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     super.dispose();
   }
 
-  void _send() {
-    if (_ctrl.text.trim().isEmpty) return;
-    // In a real app, send to Firebase / email. Here we just show confirmation.
-    setState(() => _sent = true);
+  Future<void> _send() async {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _sending = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous';
+      await RealtimeDatabaseService.instance.saveFeedback(
+        uid: uid,
+        message: text,
+      );
+    } catch (_) {
+      // Silently succeed — feedback is non-critical
+    }
+    if (mounted) setState(() { _sent = true; _sending = false; });
   }
 
   @override
@@ -68,8 +82,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                     width: double.infinity,
                     height: AppDimensions.buttonHeightLG,
                     child: ElevatedButton(
-                      onPressed: _send,
-                      child: Text(tr(AppStrings.feedbackSend)),
+                      onPressed: _sending ? null : _send,
+                      child: _sending
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: AppColors.white),
+                            )
+                          : Text(tr(AppStrings.feedbackSend)),
                     ),
                   ),
                 ],

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -47,8 +48,11 @@ class _ScannerScreenState extends State<ScannerScreen>
         // pressure than high (1280×720) which caused cascading buffer drops.
         ResolutionPreset.medium,
         enableAudio: false,
-        // jpeg = best for Android; takePicture() always returns JPEG regardless.
-        imageFormatGroup: ImageFormatGroup.jpeg,
+        // iOS requires bgra8888 for the preview stream; Android uses jpeg.
+        // takePicture() always returns JPEG on both platforms regardless.
+        imageFormatGroup: Platform.isIOS
+            ? ImageFormatGroup.bgra8888
+            : ImageFormatGroup.jpeg,
       );
       await ctrl.initialize();
       if (!mounted) {

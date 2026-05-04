@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  PLACEHOLDER — Replace this entire file with the real GoogleService-Info.plist
+  downloaded from Firebase Console:
+
+  1. Go to https://console.firebase.google.com → Project mediscan-c15e6
+  2. Project Settings → General → Your apps
+  3. Click "Add app" → iOS
+  4. Bundle ID: com.example.mediscan   (must match Runner.xcodeproj)
+  5. Download GoogleService-Info.plist and replace this file
+  6. Also copy the REVERSED_CLIENT_ID value from that file into the
+     CFBundleURLSchemes entry in Info.plist (for Google Sign-In)
+-->
+<dict>
+	<key>CLIENT_ID</key>
+	<string>REPLACE_ME</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>REPLACE_ME</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.mediscan</string>
+	<key>PROJECT_ID</key>
+	<string>mediscan-c15e6</string>
+	<key>STORAGE_BUCKET</key>
+	<string>mediscan-c15e6.appspot.com</string>
+	<key>GOOGLE_APP_ID</key>
+	<string>REPLACE_ME</string>
+	<key>DATABASE_URL</key>
+	<string>https://mediscan-c15e6-default-rtdb.asia-southeast1.firebasedatabase.app</string>
+	<key>GCM_SENDER_ID</key>
+	<string>REPLACE_ME</string>
+	<key>API_KEY</key>
+	<string>REPLACE_ME</string>
+	<key>IS_ADS_ENABLED</key>
+	<false/>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false/>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true/>
+	<key>IS_GCM_ENABLED</key>
+	<true/>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true/>
+</dict>
+</plist>

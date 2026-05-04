@@ -33,10 +33,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
+    setState(() { _loading = true; _errorMessage = null; });
     try {
       if (_isLogin) {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -44,13 +41,37 @@ class _SignInScreenState extends State<SignInScreen> {
           password: _passwordCtrl.text.trim(),
         );
       } else {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _emailCtrl.text.trim(),
-          password: _passwordCtrl.text.trim(),
-        );
+        // If the user is anonymous, link their account instead of creating a
+        // new one — this preserves all scan history accumulated as a guest.
+        final anon = FirebaseAuth.instance.currentUser;
+        if (anon != null && anon.isAnonymous) {
+          final credential = EmailAuthProvider.credential(
+            email: _emailCtrl.text.trim(),
+            password: _passwordCtrl.text.trim(),
+          );
+          try {
+            await anon.linkWithCredential(credential);
+          } on FirebaseAuthException catch (e) {
+            if (e.code == 'credential-already-in-use' ||
+                e.code == 'email-already-in-use') {
+              // Account exists — sign in instead (history stays separate)
+              await FirebaseAuth.instance.signInWithEmailAndPassword(
+                email: _emailCtrl.text.trim(),
+                password: _passwordCtrl.text.trim(),
+              );
+            } else {
+              rethrow;
+            }
+          }
+        } else {
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: _emailCtrl.text.trim(),
+            password: _passwordCtrl.text.trim(),
+          );
+        }
       }
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
+      _goHome();
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _friendlyError(e.code));
     } catch (_) {
@@ -63,30 +84,38 @@ class _SignInScreenState extends State<SignInScreen> {
   // ── Google Sign-In ────────────────────────────────────────────────────
 
   Future<void> _signInWithGoogle() async {
-    setState(() {
-      _loading = true;
-      _errorMessage = null;
-    });
+    setState(() { _loading = true; _errorMessage = null; });
     try {
       final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) {
-        // User cancelled
-        setState(() => _loading = false);
-        return;
-      }
+      if (googleUser == null) { setState(() => _loading = false); return; }
       final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      await FirebaseAuth.instance.signInWithCredential(credential);
+
+      final anon = FirebaseAuth.instance.currentUser;
+      if (anon != null && anon.isAnonymous) {
+        // Link Google credential to anonymous account to preserve history.
+        try {
+          await anon.linkWithCredential(credential);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'credential-already-in-use') {
+            await FirebaseAuth.instance.signInWithCredential(credential);
+          } else {
+            rethrow;
+          }
+        }
+      } else {
+        await FirebaseAuth.instance.signInWithCredential(credential);
+      }
+
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
+      _goHome();
     } on FirebaseAuthException catch (e) {
       setState(() => _errorMessage = _friendlyError(e.code));
-    } catch (e) {
-      setState(() =>
-          _errorMessage = 'Google Sign-In failed. Please try again.');
+    } catch (_) {
+      setState(() => _errorMessage = 'Google Sign-In failed. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -103,9 +132,20 @@ class _SignInScreenState extends State<SignInScreen> {
     } finally {
       if (mounted) {
         setState(() => _loading = false);
-        Navigator.pushReplacementNamed(context, '/home');
+        _goHome();
       }
     }
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────
+
+  /// After any successful sign-in, clear the entire back-stack and land on
+  /// home. Using pushNamedAndRemoveUntil prevents a stale sign-in screen
+  /// remaining in the back-stack (pressing Back from home would otherwise
+  /// navigate back to the sign-in screen).
+  void _goHome() {
+    if (!mounted) return;
+    Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
   }
 
   // ── Forgot password ───────────────────────────────────────────────────

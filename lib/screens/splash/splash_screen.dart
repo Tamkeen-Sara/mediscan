@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../services/local_cache_service.dart';
+import '../../utils/app_logger.dart';
 import '../../providers/language_provider.dart';
 import '../../services/translation_service.dart';
 import '../../constants/app_strings.dart';
@@ -35,17 +36,19 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _init() async {
     await Future.delayed(const Duration(milliseconds: 800));
 
-    // Seed SQLite from bundled medicines.json
-    await LocalCacheService.instance.seedIfEmpty();
+    try {
+      await LocalCacheService.instance.seedIfEmpty();
+    } catch (e, st) {
+      AppLogger.error('SQLite seeding failed', error: e, stackTrace: st);
+      // Non-fatal: app continues — Firebase / DRAP tiers still work.
+    }
 
-    // Ensure there is always a Firebase user (anonymous if not signed in).
-    // This guarantees scan saving, history, and saved medicines all work
-    // even before the user explicitly creates an account.
     if (FirebaseAuth.instance.currentUser == null) {
       try {
         await FirebaseAuth.instance.signInAnonymously();
-      } catch (_) {
-        // If anonymous sign-in fails (e.g. not enabled), continue anyway.
+      } catch (e) {
+        AppLogger.warning('Anonymous sign-in failed', error: e);
+        // Continue without auth — graceful degradation.
       }
     }
 

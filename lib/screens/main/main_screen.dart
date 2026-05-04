@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../scanner/scanner_screen.dart';
 import '../history/history_screen.dart';
@@ -35,7 +37,15 @@ class MainScreenState extends State<MainScreen> {
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
+        onTap: (i) {
+          // When the user taps the AI chat tab directly (not via scan results
+          // push), clear any medicine context so it opens as a general
+          // assistant — not pre-loaded with the last scanned medicine.
+          if (i == 2 && _currentIndex != 2) {
+            context.read<ChatProvider>().setGeneralMode();
+          }
+          setState(() => _currentIndex = i);
+        },
       ),
     );
   }

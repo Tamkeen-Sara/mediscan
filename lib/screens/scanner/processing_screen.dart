@@ -4,12 +4,14 @@ import 'package:provider/provider.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
+import '../../providers/preferences_provider.dart';
 import '../../providers/scan_provider.dart';
 import '../../services/translation_service.dart';
 
 class ProcessingScreen extends StatefulWidget {
-  final String imagePath;
-  const ProcessingScreen({super.key, required this.imagePath});
+  /// Null when the scan was triggered from manual text entry (no camera image).
+  final String? imagePath;
+  const ProcessingScreen({super.key, this.imagePath});
 
   @override
   State<ProcessingScreen> createState() => _ProcessingScreenState();
@@ -41,7 +43,20 @@ class _ProcessingScreenState extends State<ProcessingScreen>
   Future<void> _start() async {
     try {
       final provider = context.read<ScanProvider>();
-      await provider.processImage(widget.imagePath);
+      final autoSummarise =
+          context.read<PreferencesProvider>().autoSummarise;
+      // Manual-text scans have no image path — ScanProvider already has
+      // processManualText() running; here we only call processImage when
+      // a real file path was passed.
+      if (widget.imagePath != null) {
+        await provider.processImage(widget.imagePath!,
+            autoSummarise: autoSummarise);
+      } else {
+        // Wait for the provider to finish processing (started by scanner screen)
+        while (provider.phase == ScanPhase.processing) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+      }
       if (!mounted) return;
 
       final phase = provider.phase;
@@ -62,6 +77,17 @@ class _ProcessingScreenState extends State<ProcessingScreen>
       if (mounted) Navigator.pushReplacementNamed(context, '/scan-failed');
     }
   }
+
+  Widget _placeholder() => Container(
+        width: 260,
+        height: 200,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceElevatedDark,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+        ),
+        child: const Icon(Icons.text_fields,
+            size: AppDimensions.iconXXL, color: AppColors.textHintDark),
+      );
 
   @override
   void dispose() {
@@ -109,20 +135,15 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                       ClipRRect(
                         borderRadius:
                             BorderRadius.circular(AppDimensions.radiusMD),
-                        child: Image.file(
-                          File(widget.imagePath),
-                          width: 260,
-                          height: 200,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 260,
-                            height: 200,
-                            color: AppColors.surfaceElevatedDark,
-                            child: const Icon(Icons.image_outlined,
-                                size: AppDimensions.iconXXL,
-                                color: AppColors.textHintDark),
-                          ),
-                        ),
+                        child: widget.imagePath != null
+                            ? Image.file(
+                                File(widget.imagePath!),
+                                width: 260,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _placeholder(),
+                              )
+                            : _placeholder(),
                       ),
                       // Animated scan line
                       AnimatedBuilder(
