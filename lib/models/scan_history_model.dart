@@ -62,7 +62,9 @@ class ScanHistoryModel {
       // Store as milliseconds integer — Realtime DB has no Timestamp type
       'scannedAt': scannedAt.millisecondsSinceEpoch,
       'isFavourite': isFavourite,
-      if (imagePath != null) 'imagePath': imagePath,
+      // imagePath is intentionally excluded: it's a local temp-file path that
+      // the OS clears on restart. Persisting it to Firebase would produce
+      // permanently broken thumbnails when history is loaded on a fresh launch.
       if (rawOcrText != null) 'rawOcrText': rawOcrText,
       if (notes != null) 'notes': notes,
     };

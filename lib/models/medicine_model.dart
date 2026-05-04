@@ -18,10 +18,15 @@ class MedicineModel {
   final String summaryEn;
   final String summaryUr;
   final List<String> symptomsPlain;
-  final String warningsPlain;
-  final String sideEffectsPlain;
+  final List<String>? symptomsPlainUr;
+  final List<String> warningsPlain;
+  final List<String>? warningsPlainUr;
+  final List<String> sideEffectsPlain;
+  final List<String>? sideEffectsPlainUr;
   final String pregnancySafetyPlain;
+  final String? pregnancySafetyPlainUr;
   final String importantNote;
+  final String? importantNoteUr;
 
   // Safety
   final List<String> warnings;
@@ -29,6 +34,9 @@ class MedicineModel {
   final List<String> contraindications;
   final List<String> drugInteractions;
   final String pregnancyCategory;
+
+  // Prescription status
+  final bool requiresPrescription;
 
   // Search / identification
   final String searchKeywords;
@@ -38,6 +46,7 @@ class MedicineModel {
   final String? cachedSummaryEn;
   final String? cachedSummaryUr;
   final List<String>? cachedSuggestedQuestions;
+  final List<String>? cachedSuggestedQuestionsUr;
 
   // OpenFDA reference
   final String? openFdaId;
@@ -58,20 +67,27 @@ class MedicineModel {
     this.summaryEn = '',
     this.summaryUr = '',
     this.symptomsPlain = const [],
-    this.warningsPlain = '',
-    this.sideEffectsPlain = '',
+    this.symptomsPlainUr,
+    this.warningsPlain = const [],
+    this.warningsPlainUr,
+    this.sideEffectsPlain = const [],
+    this.sideEffectsPlainUr,
     this.pregnancySafetyPlain = '',
+    this.pregnancySafetyPlainUr,
     this.importantNote = '',
+    this.importantNoteUr,
     this.warnings = const [],
     this.sideEffects = const [],
     this.contraindications = const [],
     this.drugInteractions = const [],
     this.pregnancyCategory = '',
+    this.requiresPrescription = false,
     this.searchKeywords = '',
     this.aliases = const [],
     this.cachedSummaryEn,
     this.cachedSummaryUr,
     this.cachedSuggestedQuestions,
+    this.cachedSuggestedQuestionsUr,
     this.openFdaId,
   });
 
@@ -92,21 +108,29 @@ class MedicineModel {
       summaryEn: json['summaryEn']?.toString() ?? '',
       summaryUr: json['summaryUr']?.toString() ?? '',
       symptomsPlain: _toStringList(json['symptomsPlain']),
-      warningsPlain: json['warningsPlain']?.toString() ?? '',
-      sideEffectsPlain: json['sideEffectsPlain']?.toString() ?? '',
+      symptomsPlainUr: _toNullableStringList(json['symptomsPlainUr']),
+      warningsPlain: _toStringList(json['warningsPlain']),
+      warningsPlainUr: _toNullableStringList(json['warningsPlainUr']),
+      sideEffectsPlain: _toStringList(json['sideEffectsPlain']),
+      sideEffectsPlainUr: _toNullableStringList(json['sideEffectsPlainUr']),
       pregnancySafetyPlain: json['pregnancySafetyPlain']?.toString() ?? '',
+      pregnancySafetyPlainUr: json['pregnancySafetyPlainUr']?.toString(),
       importantNote: json['importantNote']?.toString() ?? '',
+      importantNoteUr: json['importantNoteUr']?.toString(),
       warnings: _toStringList(json['warnings']),
       sideEffects: _toStringList(json['sideEffects']),
       contraindications: _toStringList(json['contraindications']),
       drugInteractions: _toStringList(json['drugInteractions']),
       pregnancyCategory: json['pregnancyCategory']?.toString() ?? '',
+      requiresPrescription: json['requiresPrescription'] == true,
       searchKeywords: json['searchKeywords']?.toString() ?? '',
       aliases: _toStringList(json['aliases']),
       cachedSummaryEn: json['cachedSummaryEn']?.toString(),
       cachedSummaryUr: json['cachedSummaryUr']?.toString(),
       cachedSuggestedQuestions:
           _toNullableStringList(json['cachedSuggestedQuestions']),
+      cachedSuggestedQuestionsUr:
+          _toNullableStringList(json['cachedSuggestedQuestionsUr']),
       openFdaId: json['openFdaId']?.toString(),
     );
   }
@@ -178,12 +202,21 @@ class MedicineModel {
       'contraindications': contraindications,
       'drugInteractions': drugInteractions,
       'pregnancyCategory': pregnancyCategory,
+      'requiresPrescription': requiresPrescription,
       'searchKeywords': searchKeywords,
       'aliases': aliases,
+      if (symptomsPlainUr != null) 'symptomsPlainUr': symptomsPlainUr,
+      if (warningsPlainUr != null) 'warningsPlainUr': warningsPlainUr,
+      if (sideEffectsPlainUr != null) 'sideEffectsPlainUr': sideEffectsPlainUr,
+      if (pregnancySafetyPlainUr != null)
+        'pregnancySafetyPlainUr': pregnancySafetyPlainUr,
+      if (importantNoteUr != null) 'importantNoteUr': importantNoteUr,
       if (cachedSummaryEn != null) 'cachedSummaryEn': cachedSummaryEn,
       if (cachedSummaryUr != null) 'cachedSummaryUr': cachedSummaryUr,
       if (cachedSuggestedQuestions != null)
         'cachedSuggestedQuestions': cachedSuggestedQuestions,
+      if (cachedSuggestedQuestionsUr != null)
+        'cachedSuggestedQuestionsUr': cachedSuggestedQuestionsUr,
       if (openFdaId != null) 'openFdaId': openFdaId,
     };
   }
@@ -204,20 +237,27 @@ class MedicineModel {
     String? summaryEn,
     String? summaryUr,
     List<String>? symptomsPlain,
-    String? warningsPlain,
-    String? sideEffectsPlain,
+    List<String>? symptomsPlainUr,
+    List<String>? warningsPlain,
+    List<String>? warningsPlainUr,
+    List<String>? sideEffectsPlain,
+    List<String>? sideEffectsPlainUr,
     String? pregnancySafetyPlain,
+    String? pregnancySafetyPlainUr,
     String? importantNote,
+    String? importantNoteUr,
     List<String>? warnings,
     List<String>? sideEffects,
     List<String>? contraindications,
     List<String>? drugInteractions,
     String? pregnancyCategory,
+    bool? requiresPrescription,
     String? searchKeywords,
     List<String>? aliases,
     String? cachedSummaryEn,
     String? cachedSummaryUr,
     List<String>? cachedSuggestedQuestions,
+    List<String>? cachedSuggestedQuestionsUr,
     String? openFdaId,
   }) {
     return MedicineModel(
@@ -236,21 +276,30 @@ class MedicineModel {
       summaryEn: summaryEn ?? this.summaryEn,
       summaryUr: summaryUr ?? this.summaryUr,
       symptomsPlain: symptomsPlain ?? this.symptomsPlain,
+      symptomsPlainUr: symptomsPlainUr ?? this.symptomsPlainUr,
       warningsPlain: warningsPlain ?? this.warningsPlain,
+      warningsPlainUr: warningsPlainUr ?? this.warningsPlainUr,
       sideEffectsPlain: sideEffectsPlain ?? this.sideEffectsPlain,
+      sideEffectsPlainUr: sideEffectsPlainUr ?? this.sideEffectsPlainUr,
       pregnancySafetyPlain: pregnancySafetyPlain ?? this.pregnancySafetyPlain,
+      pregnancySafetyPlainUr:
+          pregnancySafetyPlainUr ?? this.pregnancySafetyPlainUr,
       importantNote: importantNote ?? this.importantNote,
+      importantNoteUr: importantNoteUr ?? this.importantNoteUr,
       warnings: warnings ?? this.warnings,
       sideEffects: sideEffects ?? this.sideEffects,
       contraindications: contraindications ?? this.contraindications,
       drugInteractions: drugInteractions ?? this.drugInteractions,
       pregnancyCategory: pregnancyCategory ?? this.pregnancyCategory,
+      requiresPrescription: requiresPrescription ?? this.requiresPrescription,
       searchKeywords: searchKeywords ?? this.searchKeywords,
       aliases: aliases ?? this.aliases,
       cachedSummaryEn: cachedSummaryEn ?? this.cachedSummaryEn,
       cachedSummaryUr: cachedSummaryUr ?? this.cachedSummaryUr,
       cachedSuggestedQuestions:
           cachedSuggestedQuestions ?? this.cachedSuggestedQuestions,
+      cachedSuggestedQuestionsUr:
+          cachedSuggestedQuestionsUr ?? this.cachedSuggestedQuestionsUr,
       openFdaId: openFdaId ?? this.openFdaId,
     );
   }
@@ -259,6 +308,8 @@ class MedicineModel {
   static List<String> _toStringList(dynamic v) {
     if (v == null) return [];
     if (v is List) return v.map((e) => e.toString()).toList();
+    // Legacy: if stored as a single string (old data), wrap in list
+    if (v is String && v.isNotEmpty) return [v];
     if (v is Map) return v.values.map((e) => e.toString()).toList();
     return [];
   }

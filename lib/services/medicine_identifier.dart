@@ -1,9 +1,19 @@
 import '../models/medicine_model.dart';
 import '../models/identification_result.dart';
+import '../utils/app_logger.dart';
 import 'local_cache_service.dart';
 import 'realtime_db_service.dart';
 import 'openfda_service.dart';
+import 'drap_service.dart';
+import 'rxnorm_service.dart';
 
+/// 5-tier medicine identification pipeline:
+///
+///  Tier 1 — SQLite local cache  (fastest, offline, 150 + medicines)
+///  Tier 2 — Firebase RTDB       (shared cloud cache of previously identified meds)
+///  Tier 3 — DRAP portal         (Pakistani drug register, free web scrape)
+///  Tier 4 — RxNorm / NIH        (free, stable, strong for generic names)
+///  Tier 5 — OpenFDA             (US database; useful for international generics)
 class MedicineIdentifier {
   static MedicineIdentifier? _instance;
   static MedicineIdentifier get instance =>
@@ -13,8 +23,9 @@ class MedicineIdentifier {
   final LocalCacheService _local = LocalCacheService.instance;
   final RealtimeDatabaseService _rtdb = RealtimeDatabaseService.instance;
   final OpenFdaService _fda = OpenFdaService.instance;
+  final DrapService _drap = DrapService.instance;
+  final RxNormService _rxnorm = RxNormService.instance;
 
-  /// Main entry point. Runs 3-tier lookup and computes confidence scores.
   Future<IdentificationResult> identify({
     required String rawOcrText,
     required List<String> tokens,
@@ -23,59 +34,65 @@ class MedicineIdentifier {
       return IdentificationResult.empty();
     }
 
-    // ── Tier 1: SQLite local cache ──────────────────────────────────
-    MedicineModel? candidate = await _tierOneLookup(tokens, rawOcrText);
+    MedicineModel? candidate;
 
-    // ── Tier 2: Firebase Realtime Database ─────────────────────────
+    candidate = await _tierOneLookup(tokens, rawOcrText);
     candidate ??= await _tierTwoLookup(tokens, rawOcrText);
+    candidate ??= await _tierThreeLookup(tokens);
+    candidate ??= await _tierFourLookup(tokens);
+    candidate ??= await _tierFiveLookup(tokens);
 
-    // ── Tier 3: OpenFDA API ────────────────────────────────────────
-    candidate ??= await _tierThreeLookup(tokens, rawOcrText);
+    if (candidate == null) return IdentificationResult.empty();
 
-    if (candidate == null) {
-      return IdentificationResult.empty();
-    }
-
-    return _scoreResult(
-      medicine: candidate,
-      rawOcrText: rawOcrText,
-      tokens: tokens,
-    );
+    return _scoreResult(medicine: candidate, rawOcrText: rawOcrText, tokens: tokens);
   }
 
-  // ─────────────── Tier Implementations ─────────────────────────────
+  // ─────────────── Tier 1: SQLite ────────────────────────────────────────────
 
   Future<MedicineModel?> _tierOneLookup(
       List<String> tokens, String raw) async {
-    // Try longest token substrings first (more specific)
-    final sorted = List<String>.from(tokens)
+    // Single-word tokens first — medicine names are almost always one word.
+    // Multi-word phrases tried second in case the brand is two words.
+    final singleWord = tokens.where((t) => !t.contains(' ')).toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    final multiWord = tokens.where((t) => t.contains(' ')).toList()
       ..sort((a, b) => b.length.compareTo(a.length));
 
-    for (final token in sorted.take(10)) {
+    for (final token in [...singleWord, ...multiWord]) {
       if (token.length < 3) continue;
       final result = await _local.searchLocal(token);
       if (result != null) return result;
     }
 
-    // Fallback: first line of OCR text (often the brand name)
-    final firstLine = raw.split('\n').first.trim();
-    if (firstLine.isNotEmpty) {
-      final result = await _local.searchLocal(firstLine);
+    // Last resort: individual words from the first OCR line
+    final firstLineWords = raw
+        .split('\n')
+        .first
+        .toLowerCase()
+        .split(RegExp(r'[\s,/\-\(\)\[\]\|:;]+'))
+        .where((w) => w.length >= 3)
+        .toList();
+    for (final word in firstLineWords) {
+      if (tokens.contains(word)) continue; // already tried above
+      final result = await _local.searchLocal(word);
       if (result != null) return result;
     }
     return null;
   }
 
+  // ─────────────── Tier 2: Firebase RTDB ────────────────────────────────────
+
   Future<MedicineModel?> _tierTwoLookup(
       List<String> tokens, String raw) async {
-    final sorted = List<String>.from(tokens)
+    final singleWord = tokens.where((t) => !t.contains(' ')).toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+    final multiWord = tokens.where((t) => t.contains(' ')).toList()
       ..sort((a, b) => b.length.compareTo(a.length));
 
-    for (final token in sorted.take(6)) {
+    for (final token in [...singleWord, ...multiWord].take(8)) {
       if (token.length < 3) continue;
       final results = await _rtdb.searchMedicines(token);
       if (results.isNotEmpty) {
-        // Cache best match locally for next time
         await _local.upsertMedicine(results.first);
         return results.first;
       }
@@ -83,25 +100,77 @@ class MedicineIdentifier {
     return null;
   }
 
-  Future<MedicineModel?> _tierThreeLookup(
-      List<String> tokens, String raw) async {
-    final sorted = List<String>.from(tokens)
+  // ─────────────── Tier 3: DRAP ──────────────────────────────────────────────
+
+  Future<MedicineModel?> _tierThreeLookup(List<String> tokens) async {
+    final candidates = tokens
+        .where((t) => !t.contains(' ') && t.length >= 4)
+        .toList()
       ..sort((a, b) => b.length.compareTo(a.length));
 
-    for (final token in sorted.take(4)) {
-      if (token.length < 3) continue;
-      final result = await _fda.searchMedicine(token);
-      if (result != null) {
-        // Cache in local SQLite and RTDB
-        await _local.upsertMedicine(result);
-        await _rtdb.cacheMedicine(result);
-        return result;
+    for (final token in candidates.take(4)) {
+      try {
+        final result = await _drap.searchByBrand(token) ??
+            await _drap.searchByGeneric(token);
+        if (result != null) {
+          await _local.upsertMedicine(result);
+          await _rtdb.cacheMedicine(result);
+          return result;
+        }
+      } catch (e) {
+        AppLogger.warning('DRAP tier failed for "$token"', error: e);
       }
     }
     return null;
   }
 
-  // ─────────────── Confidence Scoring ───────────────────────────────
+  // ─────────────── Tier 4: RxNorm ────────────────────────────────────────────
+
+  Future<MedicineModel?> _tierFourLookup(List<String> tokens) async {
+    final candidates = tokens
+        .where((t) => !t.contains(' ') && t.length >= 4)
+        .toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+
+    for (final token in candidates.take(4)) {
+      try {
+        final result = await _rxnorm.searchMedicine(token);
+        if (result != null) {
+          await _local.upsertMedicine(result);
+          await _rtdb.cacheMedicine(result);
+          return result;
+        }
+      } catch (e) {
+        AppLogger.warning('RxNorm tier failed for "$token"', error: e);
+      }
+    }
+    return null;
+  }
+
+  // ─────────────── Tier 5: OpenFDA ───────────────────────────────────────────
+
+  Future<MedicineModel?> _tierFiveLookup(List<String> tokens) async {
+    final candidates = tokens
+        .where((t) => !t.contains(' ') && t.length >= 4)
+        .toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+
+    for (final token in candidates.take(4)) {
+      try {
+        final result = await _fda.searchMedicine(token);
+        if (result != null) {
+          await _local.upsertMedicine(result);
+          await _rtdb.cacheMedicine(result);
+          return result;
+        }
+      } catch (e) {
+        AppLogger.warning('OpenFDA tier failed for "$token"', error: e);
+      }
+    }
+    return null;
+  }
+
+  // ─────────────── Confidence scoring ────────────────────────────────────────
 
   IdentificationResult _scoreResult({
     required MedicineModel medicine,
@@ -109,26 +178,24 @@ class MedicineIdentifier {
     required List<String> tokens,
   }) {
     final text = rawOcrText.toLowerCase();
-
-    // Name match score
     final brandScore =
         _fuzzyScore(medicine.brandName.toLowerCase(), text, tokens);
     final genericScore =
         _fuzzyScore(medicine.genericName.toLowerCase(), text, tokens);
     final nameScore = brandScore > genericScore ? brandScore : genericScore;
 
-    // Dosage match score
     double dosageScore;
     if (medicine.strength.isNotEmpty) {
-      final strengthLower = medicine.strength.toLowerCase();
-      dosageScore = text.contains(strengthLower)
+      final s = medicine.strength.toLowerCase();
+      dosageScore = text.contains(s)
           ? 1.0
-          : tokens.any((t) => t.contains(strengthLower)) ? 0.7 : 0.0;
+          : tokens.any((t) => t.contains(s))
+              ? 0.7
+              : 0.0;
     } else {
-      dosageScore = 0.5; // no dosage info to compare against
+      dosageScore = 0.5;
     }
 
-    // Brand/manufacturer score
     double brandMfgScore;
     if (medicine.manufacturer.isNotEmpty) {
       brandMfgScore =
@@ -137,13 +204,12 @@ class MedicineIdentifier {
       brandMfgScore = 0.5;
     }
 
-    // Weighted overall score
-    final overallScore =
+    final overall =
         nameScore * 0.55 + dosageScore * 0.25 + brandMfgScore * 0.20;
 
     return IdentificationResult(
       medicine: medicine,
-      overallScore: overallScore.clamp(0.0, 1.0),
+      overallScore: overall.clamp(0.0, 1.0),
       nameScore: nameScore.clamp(0.0, 1.0),
       dosageScore: dosageScore.clamp(0.0, 1.0),
       brandScore: brandMfgScore.clamp(0.0, 1.0),
@@ -152,21 +218,11 @@ class MedicineIdentifier {
     );
   }
 
-  double _fuzzyScore(
-      String target, String fullText, List<String> tokens) {
-    // Exact substring match
+  double _fuzzyScore(String target, String fullText, List<String> tokens) {
     if (fullText.contains(target)) return 1.0;
-
-    // Any token matches exactly
     if (tokens.any((t) => t == target)) return 0.95;
-
-    // Target words all present as tokens
-    final targetWords = target.split(RegExp(r'\s+'));
-    if (targetWords.every((w) => tokens.any((t) => t.contains(w)))) {
-      return 0.85;
-    }
-
-    // Levenshtein similarity on best matching token
+    final words = target.split(RegExp(r'\s+'));
+    if (words.every((w) => tokens.any((t) => t.contains(w)))) return 0.85;
     double best = 0.0;
     for (final token in tokens) {
       final sim = _levenshteinSimilarity(target, token);
@@ -178,20 +234,15 @@ class MedicineIdentifier {
   double _levenshteinSimilarity(String a, String b) {
     if (a == b) return 1.0;
     if (a.isEmpty || b.isEmpty) return 0.0;
-
     final maxLen = a.length > b.length ? a.length : b.length;
-    final dist = _levenshtein(a, b);
-    return 1.0 - dist / maxLen;
+    return 1.0 - _levenshtein(a, b) / maxLen;
   }
 
   int _levenshtein(String a, String b) {
-    final m = a.length;
-    final n = b.length;
+    final m = a.length, n = b.length;
     final dp = List.generate(m + 1, (_) => List.filled(n + 1, 0));
-
     for (int i = 0; i <= m; i++) { dp[i][0] = i; }
     for (int j = 0; j <= n; j++) { dp[0][j] = j; }
-
     for (int i = 1; i <= m; i++) {
       for (int j = 1; j <= n; j++) {
         final cost = a[i - 1] == b[j - 1] ? 0 : 1;
