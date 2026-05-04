@@ -11,10 +11,20 @@ import '../../services/symptom_match_service.dart';
 import '../../services/translation_service.dart';
 import '../../widgets/medicine_result_card.dart';
 
-class SymptomCheckerScreen extends StatelessWidget {
+class SymptomCheckerScreen extends StatefulWidget {
   const SymptomCheckerScreen({super.key});
 
-  // All 26 symptom keys mapped to English display strings
+  @override
+  State<SymptomCheckerScreen> createState() => _SymptomCheckerScreenState();
+}
+
+class _SymptomCheckerScreenState extends State<SymptomCheckerScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _slideCtrl;
+  late final Animation<Offset> _slideAnim;
+  late final Animation<double> _fadeAnim;
+
+  // All 26 symptom keys mapped to display strings via tr()
   static const _symptoms = [
     AppStrings.symptomHeadache,
     AppStrings.symptomFever,
@@ -44,11 +54,46 @@ class SymptomCheckerScreen extends StatelessWidget {
     AppStrings.symptomDiabetes,
   ];
 
+  int _lastResultCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _slideCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.25),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut));
+    _fadeAnim = CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut);
+  }
+
+  @override
+  void dispose() {
+    _slideCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onResultsChanged(List<dynamic> results) {
+    if (results.isNotEmpty && _lastResultCount == 0) {
+      _slideCtrl.forward(from: 0);
+    } else if (results.isEmpty) {
+      _slideCtrl.reverse();
+    }
+    _lastResultCount = results.length;
+  }
+
   @override
   Widget build(BuildContext context) {
     final tr = TranslationService.instance.tr;
     final checker = context.watch<SymptomCheckerProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Trigger animation whenever result count changes
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _onResultsChanged(checker.results));
 
     return Scaffold(
       appBar: AppBar(
@@ -212,19 +257,25 @@ class SymptomCheckerScreen extends StatelessWidget {
                               ],
                             ),
                           )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(
-                                AppDimensions.pagePadding),
-                            itemCount: checker.results.length,
-                            itemBuilder: (ctx, i) {
-                              final r = checker.results[i];
-                              return MedicineResultCard(
-                                result: r,
-                                onViewDetails: () =>
-                                    _viewDetails(ctx, r),
-                                onAskAI: () => _askAI(ctx, r),
-                              );
-                            },
+                        : SlideTransition(
+                            position: _slideAnim,
+                            child: FadeTransition(
+                              opacity: _fadeAnim,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.all(
+                                    AppDimensions.pagePadding),
+                                itemCount: checker.results.length,
+                                itemBuilder: (ctx, i) {
+                                  final r = checker.results[i];
+                                  return MedicineResultCard(
+                                    result: r,
+                                    onViewDetails: () =>
+                                        _viewDetails(ctx, r),
+                                    onAskAI: () => _askAI(ctx, r),
+                                  );
+                                },
+                              ),
+                            ),
                           ),
           ),
         ],

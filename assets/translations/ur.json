@@ -52,6 +52,7 @@
   "shortcut_dosage": "خوراک",
   "shortcut_interactions": "تعامل",
   "shortcut_side_effects": "ضمنی اثرات",
+  "shortcut_pregnancy": "حمل میں محفوظ؟",
   "point_at_medicine": "دوائی کے لیبل پر پوائنٹ کریں",
 
   "processing_title": "دوائی کا تجزیہ",
@@ -82,6 +83,8 @@
   "side_effects_label": "ضمنی اثرات",
   "pregnancy_label": "حمل اور دودھ پلانا",
   "storage_label": "ذخیرہ",
+  "badge_otc": "OTC",
+  "badge_rx": "Rx",
   "onset_label": "یہ کب کام کرنا شروع کرتی ہے",
   "questions_title": "AI سے پوچھنے کے تجویز کردہ سوالات",
   "questions_loading": "تجویز کردہ سوالات تیار ہو رہے ہیں...",
@@ -101,6 +104,7 @@
   "enter_manually": "دستی درج کریں",
 
   "confidence_title": "اعتماد کا اسکور",
+  "view_confidence_details": "اعتماد کی تفصیل دیکھیں",
   "overall_score": "مجموعی میچ",
   "name_score": "نام میچ",
   "dosage_score": "خوراک میچ",

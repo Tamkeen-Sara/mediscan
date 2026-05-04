@@ -22,6 +22,14 @@ class _SafetyCardState extends State<SafetyCard> {
   @override
   Widget build(BuildContext context) {
     final tr = TranslationService.instance.tr;
+    final med = widget.medicine;
+
+    final warnings = med.warningsPlain.isNotEmpty
+        ? med.warningsPlain
+        : med.warnings;
+    final sideEffects = med.sideEffectsPlain.isNotEmpty
+        ? med.sideEffectsPlain
+        : med.sideEffects;
 
     return Card(
       margin: const EdgeInsets.only(bottom: AppDimensions.spaceMD),
@@ -43,37 +51,34 @@ class _SafetyCardState extends State<SafetyCard> {
               ],
             ),
             const Divider(height: AppDimensions.spaceLG),
-            _Section(
+            _BulletSection(
               label: tr(AppStrings.warningsLabel),
-              content: widget.medicine.warningsPlain.isNotEmpty
-                  ? widget.medicine.warningsPlain
-                  : widget.medicine.warnings.join('\n• '),
+              items: warnings,
               expanded: _warningsExpanded,
               onToggle: () =>
                   setState(() => _warningsExpanded = !_warningsExpanded),
               icon: Icons.warning_amber_outlined,
               color: AppColors.statusAmber,
             ),
-            _Section(
+            _BulletSection(
               label: tr(AppStrings.sideEffectsLabel),
-              content: widget.medicine.sideEffectsPlain.isNotEmpty
-                  ? widget.medicine.sideEffectsPlain
-                  : widget.medicine.sideEffects.join('\n• '),
+              items: sideEffects,
               expanded: _sideEffectsExpanded,
-              onToggle: () => setState(
-                  () => _sideEffectsExpanded = !_sideEffectsExpanded),
+              onToggle: () =>
+                  setState(() => _sideEffectsExpanded = !_sideEffectsExpanded),
               icon: Icons.health_and_safety_outlined,
               color: AppColors.statusRed,
             ),
-            _Section(
-              label: tr(AppStrings.pregnancyLabel),
-              content: widget.medicine.pregnancySafetyPlain,
-              expanded: _pregnancyExpanded,
-              onToggle: () => setState(
-                  () => _pregnancyExpanded = !_pregnancyExpanded),
-              icon: Icons.pregnant_woman_outlined,
-              color: AppColors.primaryBlue,
-            ),
+            if (med.pregnancySafetyPlain.isNotEmpty)
+              _TextSection(
+                label: tr(AppStrings.pregnancyLabel),
+                content: med.pregnancySafetyPlain,
+                expanded: _pregnancyExpanded,
+                onToggle: () =>
+                    setState(() => _pregnancyExpanded = !_pregnancyExpanded),
+                icon: Icons.pregnant_woman_outlined,
+                color: AppColors.primaryBlue,
+              ),
           ],
         ),
       ),
@@ -81,7 +86,80 @@ class _SafetyCardState extends State<SafetyCard> {
   }
 }
 
-class _Section extends StatelessWidget {
+// ── Bullet list section ───────────────────────────────────────────────────────
+
+class _BulletSection extends StatelessWidget {
+  final String label;
+  final List<String> items;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final IconData icon;
+  final Color color;
+
+  const _BulletSection({
+    required this.label,
+    required this.items,
+    required this.expanded,
+    required this.onToggle,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        _Header(
+            label: label,
+            icon: icon,
+            color: color,
+            expanded: expanded,
+            onToggle: onToggle),
+        AnimatedSize(
+          duration: const Duration(milliseconds: AppDimensions.animNormal),
+          curve: Curves.easeInOut,
+          child: expanded
+              ? Padding(
+                  padding: const EdgeInsets.only(
+                      bottom: AppDimensions.spaceSM,
+                      left: AppDimensions.spaceMD + AppDimensions.iconSM),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: items
+                        .map((item) => Padding(
+                              padding: const EdgeInsets.only(
+                                  bottom: AppDimensions.spaceXXS),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('• ',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: color)),
+                                  Expanded(
+                                    child: Text(item,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall),
+                                  ),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Plain text section (pregnancy info) ─────────────────────────────────────
+
+class _TextSection extends StatelessWidget {
   final String label;
   final String content;
   final bool expanded;
@@ -89,7 +167,7 @@ class _Section extends StatelessWidget {
   final IconData icon;
   final Color color;
 
-  const _Section({
+  const _TextSection({
     required this.label,
     required this.content,
     required this.expanded,
@@ -100,47 +178,73 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (content.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
-        InkWell(
-          onTap: onToggle,
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: AppDimensions.spaceSM),
-            child: Row(
-              children: [
-                Icon(icon, size: AppDimensions.iconSM, color: color),
-                const SizedBox(width: AppDimensions.spaceSM),
-                Expanded(
-                    child: Text(label,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600))),
-                Icon(
-                  expanded ? Icons.expand_less : Icons.expand_more,
-                  size: AppDimensions.iconSM,
-                ),
-              ],
-            ),
-          ),
-        ),
-        AnimatedCrossFade(
-          firstChild: Padding(
-            padding: const EdgeInsets.only(
-                bottom: AppDimensions.spaceSM,
-                left: AppDimensions.spaceMD + AppDimensions.iconSM),
-            child: Text(content,
-                style: Theme.of(context).textTheme.bodySmall),
-          ),
-          secondChild: const SizedBox.shrink(),
-          crossFadeState: expanded
-              ? CrossFadeState.showFirst
-              : CrossFadeState.showSecond,
+        _Header(
+            label: label,
+            icon: icon,
+            color: color,
+            expanded: expanded,
+            onToggle: onToggle),
+        AnimatedSize(
           duration: const Duration(milliseconds: AppDimensions.animNormal),
+          curve: Curves.easeInOut,
+          child: expanded
+              ? Padding(
+                  padding: const EdgeInsets.only(
+                      bottom: AppDimensions.spaceSM,
+                      left: AppDimensions.spaceMD + AppDimensions.iconSM),
+                  child: Text(content,
+                      style: Theme.of(context).textTheme.bodySmall),
+                )
+              : const SizedBox.shrink(),
         ),
       ],
+    );
+  }
+}
+
+// ── Shared expandable header ─────────────────────────────────────────────────
+
+class _Header extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  const _Header({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onToggle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppDimensions.spaceSM),
+        child: Row(
+          children: [
+            Icon(icon, size: AppDimensions.iconSM, color: color),
+            const SizedBox(width: AppDimensions.spaceSM),
+            Expanded(
+              child: Text(label,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+            ),
+            Icon(
+              expanded ? Icons.expand_less : Icons.expand_more,
+              size: AppDimensions.iconSM,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

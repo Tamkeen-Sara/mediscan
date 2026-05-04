@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
+import '../../models/identification_result.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/scan_provider.dart';
+import '../../services/gemini_service.dart';
 import '../../services/translation_service.dart';
 import '../../widgets/confidence_badge.dart';
 import '../../widgets/dosage_card.dart';
@@ -18,19 +21,27 @@ import '../../widgets/symptom_chips_row.dart';
 import '../../widgets/save_success_dialog.dart';
 
 class ScanResultsScreen extends StatelessWidget {
-  /// When true, this screen is shown from SymptomChecker "View Details"
-  /// and does not have a save button.
+  /// When true, shown from SymptomChecker "View Details" — no save button.
   final bool isInfoMode;
   const ScanResultsScreen({super.key, this.isInfoMode = false});
 
   @override
   Widget build(BuildContext context) {
-    final scan = context.watch<ScanProvider>();
+    // context.select: only the selected field triggers a rebuild,
+    // not the entire ListView on every notifyListeners() call.
+    final result = context
+        .select<ScanProvider, IdentificationResult?>((p) => p.result);
+    final summaryResult = context
+        .select<ScanProvider, GeminiSummaryResult?>((p) => p.summaryResult);
+    final phase =
+        context.select<ScanProvider, ScanPhase>((p) => p.phase);
+    final isSaved =
+        context.select<ScanProvider, bool>((p) => p.isSaved);
+    final suggestedQuestions = context
+        .select<ScanProvider, List<String>>((p) => p.suggestedQuestions);
     final lang = context.watch<LanguageProvider>();
     final tr = TranslationService.instance.tr;
-    final result = scan.result;
 
-    // Guard: result not yet available
     if (result == null) {
       return Scaffold(
         appBar: AppBar(title: Text(tr(AppStrings.resultsTitle))),
@@ -54,16 +65,18 @@ class ScanResultsScreen extends StatelessWidget {
     final med = result.medicine;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final summary = lang.isRTL
-        ? (scan.summaryResult?.summaryUr.isNotEmpty == true
-            ? scan.summaryResult!.summaryUr
+        ? (summaryResult?.summaryUr.isNotEmpty == true
+            ? summaryResult!.summaryUr
             : med.cachedSummaryUr ?? med.summaryUr)
-        : scan.summaryEn;
+        : (summaryResult?.summaryEn ??
+            med.cachedSummaryEn ??
+            med.summaryEn);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(tr(AppStrings.resultsTitle)),
         actions: [
-          // ── Language toggle ─────────────────────────────────────────
+          // ── Language toggle ──────────────────────────────────────────
           IconButton(
             icon: Text(
               lang.isRTL ? 'EN' : 'UR',
@@ -78,36 +91,68 @@ class ScanResultsScreen extends StatelessWidget {
                 .read<LanguageProvider>()
                 .setLanguage(lang.isRTL ? 'en' : 'ur'),
           ),
-          // ── Ask AI shortcut ─────────────────────────────────────────
+          // ── Ask AI shortcut ──────────────────────────────────────────
           IconButton(
             icon: const Icon(Icons.smart_toy_outlined),
             tooltip: tr(AppStrings.askAIButton),
             onPressed: () => _openChat(context, null),
           ),
-          // ── Save ────────────────────────────────────────────────────
+          // ── Save ─────────────────────────────────────────────────────
           if (!isInfoMode)
             IconButton(
               icon: Icon(
-                scan.isSaved ? Icons.bookmark : Icons.bookmark_border,
-                color: scan.isSaved ? AppColors.accentOrange : null,
+                isSaved ? Icons.bookmark : Icons.bookmark_border,
+                color: isSaved ? AppColors.accentOrange : null,
               ),
-              onPressed: scan.isSaved
-                  ? null
-                  : () => _saveMedicine(context, tr),
+              onPressed: isSaved ? null : () => _saveMedicine(context, tr),
               tooltip: tr(AppStrings.saveButton),
             ),
-          // ── Edit ────────────────────────────────────────────────────
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: () => Navigator.pushNamed(context, '/manual-edit'),
-            tooltip: tr(AppStrings.editButton),
+          // ── 3-dot overflow menu ───────────────────────────────────────
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              switch (value) {
+                case 'confidence':
+                  Navigator.pushNamed(context, '/confidence');
+                case 'edit':
+                  Navigator.pushNamed(context, '/manual-edit');
+                case 'share':
+                  _shareMedicine(context, med.displayName, med.genericName,
+                      med.manufacturer, med.category, summary);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'confidence',
+                child: Row(children: [
+                  const Icon(Icons.bar_chart_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Text(tr(AppStrings.viewConfidenceDetails)),
+                ]),
+              ),
+              PopupMenuItem(
+                value: 'edit',
+                child: Row(children: [
+                  const Icon(Icons.edit_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Text(tr(AppStrings.editButton)),
+                ]),
+              ),
+              PopupMenuItem(
+                value: 'share',
+                child: Row(children: [
+                  const Icon(Icons.share_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Text(tr(AppStrings.share)),
+                ]),
+              ),
+            ],
           ),
         ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(AppDimensions.pagePadding),
         children: [
-          // ── Section 1: Identity header ─────────────────────────────
+          // ── Section 1: Identity header ───────────────────────────────
           Card(
             margin: const EdgeInsets.only(bottom: AppDimensions.spaceMD),
             child: Padding(
@@ -155,66 +200,73 @@ class ScanResultsScreen extends StatelessWidget {
                           ),
                     ),
                   ],
-                  if (med.category.isNotEmpty) ...[
-                    const SizedBox(height: AppDimensions.spaceXS),
-                    Chip(
-                      label: Text(med.category),
-                      labelStyle: Theme.of(context)
-                          .textTheme
-                          .labelSmall
-                          ?.copyWith(color: AppColors.primaryBlue),
-                      backgroundColor: isDark
-                          ? AppColors.infoBlueTintDark
-                          : AppColors.infoBlueTint,
-                      side: BorderSide(
-                          color:
-                              AppColors.primaryBlue.withValues(alpha: 0.3)),
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ],
+                  const SizedBox(height: AppDimensions.spaceXS),
+                  // ── OTC/Rx + Form badges ─────────────────────────────
+                  Wrap(
+                    spacing: AppDimensions.spaceXS,
+                    runSpacing: AppDimensions.spaceXS,
+                    children: [
+                      _BadgeChip(
+                        label: med.requiresPrescription
+                            ? tr(AppStrings.badgeRx)
+                            : tr(AppStrings.badgeOtc),
+                        color: med.requiresPrescription
+                            ? AppColors.accentOrange
+                            : AppColors.statusGreen,
+                        isDark: isDark,
+                      ),
+                      if (med.dosageForm.isNotEmpty)
+                        _BadgeChip(
+                          label: med.dosageForm,
+                          color: AppColors.primaryBlue,
+                          isDark: isDark,
+                        ),
+                      if (med.category.isNotEmpty)
+                        _BadgeChip(
+                          label: med.category,
+                          color: AppColors.primaryBlue,
+                          isDark: isDark,
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
 
-          // ── Section 2: Plain-language AI summary ───────────────────
+          // ── Section 2: AI summary ────────────────────────────────────
           PlainLanguageSummaryCard(
             summary: summary.isNotEmpty ? summary : null,
-            isLoading: scan.phase == ScanPhase.processing &&
-                summary.isEmpty,
+            isLoading: phase == ScanPhase.processing && summary.isEmpty,
           ),
 
-          // ── Section 3: Symptom chips ───────────────────────────────
+          // ── Section 3: Symptom chips ─────────────────────────────────
           if (med.symptomsPlain.isNotEmpty) ...[
             _SectionLabel(tr(AppStrings.symptomsTitle)),
             Padding(
-              padding:
-                  const EdgeInsets.only(bottom: AppDimensions.spaceMD),
+              padding: const EdgeInsets.only(bottom: AppDimensions.spaceMD),
               child: SymptomChipsRow(
                 symptoms: med.symptomsPlain,
-                onChipTap: () =>
+                onChipTap: (_) =>
                     Navigator.pushNamed(context, '/symptom-checker'),
               ),
             ),
           ],
 
-          // ── Section 4: Dosage ──────────────────────────────────────
+          // ── Section 4: Dosage ────────────────────────────────────────
           if (med.dosageAdults.isNotEmpty ||
               med.dosageChildren.isNotEmpty ||
               med.maxDailyDose.isNotEmpty)
             DosageCard(medicine: med),
 
-          // ── Section 5: Safety ──────────────────────────────────────
+          // ── Section 5: Safety ────────────────────────────────────────
           if (med.warningsPlain.isNotEmpty ||
               med.warnings.isNotEmpty ||
               med.sideEffects.isNotEmpty)
             SafetyCard(medicine: med),
 
-          // ── Section 6: Onset + Storage ─────────────────────────────
-          if (med.onsetTime.isNotEmpty ||
-              med.storageInstructions.isNotEmpty)
+          // ── Section 6: Onset + Storage ───────────────────────────────
+          if (med.onsetTime.isNotEmpty || med.storageInstructions.isNotEmpty)
             MediInfoCard(
               title: '',
               titleIcon: Icons.access_time_outlined,
@@ -234,23 +286,23 @@ class ScanResultsScreen extends StatelessWidget {
               ],
             ),
 
-          // ── Section 7: Suggested questions ────────────────────────
-          if (scan.suggestedQuestions.isNotEmpty ||
-              scan.phase == ScanPhase.processing)
+          // ── Section 7: Suggested questions ──────────────────────────
+          if (suggestedQuestions.isNotEmpty ||
+              phase == ScanPhase.processing)
             SuggestedQuestionsCard(
-              questions: scan.suggestedQuestions,
-              isLoading: scan.suggestedQuestions.isEmpty &&
-                  scan.phase == ScanPhase.processing,
+              questions: suggestedQuestions,
+              isLoading: suggestedQuestions.isEmpty &&
+                  phase == ScanPhase.processing,
               onQuestionTap: (q) => _openChat(context, q),
             ),
 
-          // ── Section 8: Emergency ───────────────────────────────────
+          // ── Section 8: Emergency ─────────────────────────────────────
           const EmergencyCard(),
 
           const SizedBox(height: AppDimensions.spaceLG),
 
-          // ── Bottom action buttons ──────────────────────────────────
-          if (!isInfoMode && !scan.isSaved)
+          // ── Bottom action buttons ────────────────────────────────────
+          if (!isInfoMode && !isSaved)
             SizedBox(
               width: double.infinity,
               height: AppDimensions.buttonHeightLG,
@@ -260,18 +312,47 @@ class ScanResultsScreen extends StatelessWidget {
                 onPressed: () => _saveMedicine(context, tr),
               ),
             ),
-          const SizedBox(height: AppDimensions.spaceSM),
+          if (!isInfoMode && !isSaved)
+            const SizedBox(height: AppDimensions.spaceSM),
 
-          // Ask AI — also in AppBar icon above, but kept here as a
-          // larger prominent call-to-action for first-time users.
-          SizedBox(
-            width: double.infinity,
-            height: AppDimensions.buttonHeightLG,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.smart_toy_outlined),
-              label: Text(tr(AppStrings.askAIButton)),
-              onPressed: () => _openChat(context, null),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: AppDimensions.buttonHeightLG,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(Icons.share_outlined),
+                    label: Text(tr(AppStrings.share)),
+                    onPressed: () => _shareMedicine(
+                        context,
+                        med.displayName,
+                        med.genericName,
+                        med.manufacturer,
+                        med.category,
+                        summary),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppDimensions.spaceSM),
+              Expanded(
+                child: SizedBox(
+                  height: AppDimensions.buttonHeightLG,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(Icons.smart_toy_outlined),
+                    label: Text(tr(AppStrings.askAIButton)),
+                    onPressed: () => _openChat(context, null),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppDimensions.spaceHuge),
         ],
@@ -279,13 +360,36 @@ class ScanResultsScreen extends StatelessWidget {
     );
   }
 
+  void _shareMedicine(
+    BuildContext context,
+    String displayName,
+    String genericName,
+    String manufacturer,
+    String category,
+    String summary,
+  ) {
+    final buf = StringBuffer();
+    buf.writeln('💊 $displayName');
+    if (genericName.isNotEmpty && genericName != displayName) {
+      buf.writeln('Generic: $genericName');
+    }
+    if (manufacturer.isNotEmpty) buf.writeln('Manufacturer: $manufacturer');
+    if (category.isNotEmpty) buf.writeln('Category: $category');
+    if (summary.isNotEmpty) {
+      buf.writeln();
+      buf.writeln(summary);
+    }
+    buf.writeln();
+    buf.write('Scanned with MediScan');
+    Share.share(buf.toString(), subject: displayName);
+  }
+
   Future<void> _saveMedicine(
       BuildContext context, String Function(String) tr) async {
     await context.read<ScanProvider>().saveCurrentMedicine();
     if (!context.mounted) return;
     SaveSuccessDialog.show(context,
-        onViewSaved: () =>
-            Navigator.pushNamed(context, '/saved-medicines'));
+        onViewSaved: () => Navigator.pushNamed(context, '/saved-medicines'));
   }
 
   void _openChat(BuildContext context, String? question) {
@@ -293,8 +397,7 @@ class ScanResultsScreen extends StatelessWidget {
     final lang = context.read<LanguageProvider>();
     final chat = context.read<ChatProvider>();
     if (scan.medicine != null) {
-      chat.initWithContext(scan.medicine!,
-          languageCode: lang.languageCode);
+      chat.initWithContext(scan.medicine!, languageCode: lang.languageCode);
     }
     if (question != null) {
       chat.sendMessage(question, languageCode: lang.languageCode);
@@ -315,6 +418,37 @@ class _SectionLabel extends StatelessWidget {
         label,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: AppColors.primaryBlue,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
+  }
+}
+
+class _BadgeChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool isDark;
+
+  const _BadgeChip({
+    required this.label,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.2 : 0.12),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
               fontWeight: FontWeight.w700,
             ),
       ),

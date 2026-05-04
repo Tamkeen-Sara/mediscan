@@ -58,6 +58,10 @@ class EmergencyCard extends StatelessWidget {
               shape: RoundedRectangleBorder(
                   borderRadius:
                       BorderRadius.circular(AppDimensions.radiusSM)),
+              // Must override global minimumSize(double.infinity, 48)
+              // — buttons inside a Row crash with infinite width otherwise.
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             icon: const Icon(Icons.call, size: AppDimensions.iconSM),
             label: Text(tr(AppStrings.emergencyCall)),

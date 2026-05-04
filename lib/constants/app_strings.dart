@@ -59,6 +59,7 @@ class AppStrings {
   static const String shortcutDosage = 'shortcut_dosage';
   static const String shortcutInteractions = 'shortcut_interactions';
   static const String shortcutSideEffects = 'shortcut_side_effects';
+  static const String shortcutPregnancy = 'shortcut_pregnancy';
   static const String pointAtMedicine = 'point_at_medicine';
 
   // ── Processing ────────────────────────────────────────────────────────────────
@@ -91,6 +92,8 @@ class AppStrings {
   static const String sideEffectsLabel = 'side_effects_label';
   static const String pregnancyLabel = 'pregnancy_label';
   static const String storageLabel = 'storage_label';
+  static const String badgeOtc = 'badge_otc';
+  static const String badgeRx = 'badge_rx';
   static const String onsetLabel = 'onset_label';
   static const String questionsTitle = 'questions_title';
   static const String questionsLoading = 'questions_loading';
@@ -112,6 +115,7 @@ class AppStrings {
 
   // ── Confidence Screen ─────────────────────────────────────────────────────────
   static const String confidenceTitle = 'confidence_title';
+  static const String viewConfidenceDetails = 'view_confidence_details';
   static const String overallScore = 'overall_score';
   static const String nameScore = 'name_score';
   static const String dosageScore = 'dosage_score';

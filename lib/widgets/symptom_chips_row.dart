@@ -4,7 +4,9 @@ import '../constants/app_dimensions.dart';
 
 class SymptomChipsRow extends StatelessWidget {
   final List<String> symptoms;
-  final VoidCallback? onChipTap;
+  /// Called with the tapped symptom label. If null, chips still show a SnackBar
+  /// but do nothing else.
+  final void Function(String symptom)? onChipTap;
 
   const SymptomChipsRow({
     super.key,
@@ -22,7 +24,22 @@ class SymptomChipsRow extends StatelessWidget {
       runSpacing: AppDimensions.symptomChipRunSpacing,
       children: symptoms.map((symptom) {
         return GestureDetector(
-          onTap: onChipTap,
+          onTap: () {
+            ScaffoldMessenger.of(context).clearSnackBars();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Used for: $symptom'),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+                action: onChipTap != null
+                    ? SnackBarAction(
+                        label: 'Check',
+                        onPressed: () => onChipTap!(symptom),
+                      )
+                    : null,
+              ),
+            );
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(
               horizontal: AppDimensions.chipPaddingH,

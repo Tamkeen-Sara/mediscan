@@ -52,6 +52,7 @@
   "shortcut_dosage": "Dosage",
   "shortcut_interactions": "Interactions",
   "shortcut_side_effects": "Side Effects",
+  "shortcut_pregnancy": "Pregnancy Safety",
   "point_at_medicine": "Point at the medicine label",
 
   "processing_title": "Analysing Medicine",
@@ -82,6 +83,8 @@
   "side_effects_label": "Side Effects",
   "pregnancy_label": "Pregnancy & Breastfeeding",
   "storage_label": "Storage",
+  "badge_otc": "OTC",
+  "badge_rx": "Rx",
   "onset_label": "When Does It Start Working",
   "questions_title": "Suggested Questions for AI",
   "questions_loading": "Preparing suggested questions...",
@@ -101,6 +104,7 @@
   "enter_manually": "Enter Manually",
 
   "confidence_title": "Confidence Score",
+  "view_confidence_details": "View Confidence Details",
   "overall_score": "Overall Match",
   "name_score": "Name Match",
   "dosage_score": "Dosage Match",
