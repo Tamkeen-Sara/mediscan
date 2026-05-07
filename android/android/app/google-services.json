@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "41707444344",
+    "firebase_url": "https://mediscan-c15e6-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "mediscan-c15e6",
+    "storage_bucket": "mediscan-c15e6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:41707444344:android:e27538f9a01b4b6213358d",
+        "android_client_info": {
+          "package_name": "com.example.mediscan"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "41707444344-39kt544q0rir8tm20cfpefl0m17r4nub.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.mediscan",
+            "certificate_hash": "1368d22e3c8d09d29d2bf0530ac13af49d7cea3a"
+          }
+        },
+        {
+          "client_id": "41707444344-aj7ijj07s2rpqojiji2bpj4jg9pjqoa8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADbkFqP0h3kNwve61J5Lvo2bZdv4QwyvA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "41707444344-aj7ijj07s2rpqojiji2bpj4jg9pjqoa8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
