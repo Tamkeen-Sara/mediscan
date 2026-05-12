@@ -4,6 +4,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../services/translation_service.dart';
 import '../../constants/app_strings.dart';
+import '../../widgets/animated_cards.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -71,40 +72,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 itemCount: _pages.length,
                 itemBuilder: (context, i) {
                   final (titleKey, bodyKey, icon) = _pages[i];
-                  return Padding(
-                    padding: const EdgeInsets.all(AppDimensions.sectionPadding),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: AppDimensions.logoSizeLG,
-                          height: AppDimensions.logoSizeLG,
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? AppColors.infoBlueTintDark
-                                : AppColors.primaryBlueLight,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(icon,
-                              size: AppDimensions.iconXXL,
-                              color: AppColors.primaryBlue),
+                  return Center(
+                    child: FadeInCard(
+                      delay: const Duration(milliseconds: 80),
+                      child: Padding(
+                        padding:
+                            const EdgeInsets.all(AppDimensions.sectionPadding),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: AppDimensions.logoSizeLG,
+                              height: AppDimensions.logoSizeLG,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.infoBlueTintDark
+                                    : AppColors.primaryBlueLight,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(icon,
+                                  size: AppDimensions.iconXXL,
+                                  color: AppColors.primaryBlue),
+                            ),
+                            const SizedBox(height: AppDimensions.spaceXL),
+                            Text(
+                              tr(titleKey),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: AppDimensions.spaceMD),
+                            Text(
+                              tr(bodyKey),
+                              style: Theme.of(context).textTheme.bodyMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: AppDimensions.spaceXL),
-                        Text(
-                          tr(titleKey),
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: AppDimensions.spaceMD),
-                        Text(
-                          tr(bodyKey),
-                          style: Theme.of(context).textTheme.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                      ),
                     ),
                   );
                 },
@@ -139,13 +146,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppDimensions.sectionPadding),
-              child: SizedBox(
-                width: double.infinity,
-                height: AppDimensions.buttonHeightLG,
-                child: ElevatedButton(
-                  onPressed: _next,
-                  child: Text(
-                      isLast ? tr(AppStrings.getStarted) : tr(AppStrings.next)),
+              child: FadeInCard(
+                delay: const Duration(milliseconds: 180),
+                padding: EdgeInsets.zero,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: AppDimensions.buttonHeightLG,
+                  child: ElevatedButton(
+                    onPressed: _next,
+                    child: Text(isLast
+                        ? tr(AppStrings.getStarted)
+                        : tr(AppStrings.next)),
+                  ),
                 ),
               ),
             ),

@@ -9,6 +9,7 @@ class IdentificationResult {
   final double brandScore;
   final String rawOcrText;
   final List<String> extractedTokens;
+  final String? source; // e.g., "Local Cache", "Firebase", "Gemini"
 
   const IdentificationResult({
     required this.medicine,
@@ -18,6 +19,7 @@ class IdentificationResult {
     this.brandScore = 0.0,
     this.rawOcrText = '',
     this.extractedTokens = const [],
+    this.source,
   });
 
   ScanStatus get scanStatus {
@@ -39,5 +41,6 @@ class IdentificationResult {
   static IdentificationResult empty() => const IdentificationResult(
         medicine: MedicineModel(id: '', brandName: '', genericName: ''),
         overallScore: 0.0,
+        source: null,
       );
 }

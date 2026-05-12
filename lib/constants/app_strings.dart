@@ -61,6 +61,23 @@ class AppStrings {
   static const String shortcutSideEffects = 'shortcut_side_effects';
   static const String shortcutPregnancy = 'shortcut_pregnancy';
   static const String pointAtMedicine = 'point_at_medicine';
+  static const String prescriptionTitle = 'prescription_title';
+  static const String prescriptionSubtitle = 'prescription_subtitle';
+  static const String prescriptionOpenAction = 'prescription_open_action';
+  static const String prescriptionUploadButton = 'prescription_upload_button';
+  static const String prescriptionCameraTab = 'prescription_camera_tab';
+  static const String prescriptionGalleryTab = 'prescription_gallery_tab';
+  static const String prescriptionAnalyzing = 'prescription_analyzing';
+  static const String prescriptionNoMedicinesFound = 'prescription_no_medicines_found';
+  static const String prescriptionInteractionWarnings = 'prescription_interaction_warnings';
+  static const String prescriptionDosage = 'prescription_dosage';
+  static const String prescriptionFrequency = 'prescription_frequency';
+  static const String prescriptionNotes = 'prescription_notes';
+  static const String prescriptionExplainButton = 'prescription_explain_button';
+  static const String prescriptionReminderButton = 'prescription_reminder_button';
+  static const String prescriptionReminderSaved = 'prescription_reminder_saved';
+  static const String cameraNotAvailable = 'camera_not_available';
+  static const String pickFromGallery = 'pick_from_gallery';
 
   // ── Processing ────────────────────────────────────────────────────────────────
   static const String processingTitle = 'processing_title';
@@ -183,6 +200,10 @@ class AppStrings {
   // ── Settings sections ─────────────────────────────────────────────────────────
   static const String appearanceSection = 'appearance_section';
   static const String dataSection = 'data_section';
+  static const String clearLocalCache = 'clear_local_cache';
+  static const String clearLocalCacheDesc = 'clear_local_cache_desc';
+  static const String clearLocalCacheConfirm = 'clear_local_cache_confirm';
+  static const String clearLocalCacheDone = 'clear_local_cache_done';
   static const String supportSection = 'support_section';
 
   // ── Theme selector ────────────────────────────────────────────────────────────

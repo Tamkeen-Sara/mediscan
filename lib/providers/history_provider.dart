@@ -62,11 +62,25 @@ class HistoryProvider extends ChangeNotifier {
   }
 
   /// Called from HistoryScreen to ensure listener is running.
-  /// Safe to call multiple times — no-op if already listening.
-  void init() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    if (_historySub != null) return; // already running
+  /// Safe to call multiple times — always refreshes the stream to avoid
+  /// stale listeners if auth/session changed in background flows.
+  Future<void> init() async {
+    var uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      try {
+        final cred = await FirebaseAuth.instance.signInAnonymously();
+        uid = cred.user?.uid;
+      } catch (_) {
+        // Keep graceful behavior if anonymous auth is disabled.
+      }
+    }
+    if (uid == null) {
+      _allItems = [];
+      _filtered = [];
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
     _startListening(uid);
   }
 

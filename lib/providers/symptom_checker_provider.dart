@@ -10,6 +10,7 @@ class SymptomCheckerProvider extends ChangeNotifier {
   SymptomMode _mode = SymptomMode.allMedicines;
   List<SymptomMatchResult> _results = [];
   bool _isSearching = false;
+  int _searchGeneration = 0;
 
   List<String> get selectedSymptoms => List.unmodifiable(_selectedSymptoms);
   SymptomMode get mode => _mode;
@@ -44,22 +45,35 @@ class SymptomCheckerProvider extends ChangeNotifier {
   Future<void> _runSearch() async {
     if (_selectedSymptoms.isEmpty) {
       _results = [];
+      _isSearching = false;
       notifyListeners();
       return;
     }
 
+    final generation = ++_searchGeneration;
     _isSearching = true;
     notifyListeners();
 
     try {
-      final allMedicines = await LocalCacheService.instance.getAllMedicines();
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+
+      final allMedicinesFuture = LocalCacheService.instance
+          .getAllMedicines()
+          .timeout(const Duration(seconds: 8), onTimeout: () => <MedicineModel>[]);
+
+      final savedMedicinesFuture = uid == null
+          ? Future.value(<MedicineModel>[])
+          : RealtimeDatabaseService.instance
+              .getSavedMedicines(uid)
+              .timeout(const Duration(seconds: 4),
+                  onTimeout: () => <MedicineModel>[]);
+
+      final allMedicines = await allMedicinesFuture;
 
       List<MedicineModel> savedMedicines = [];
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null) {
-        savedMedicines =
-            await RealtimeDatabaseService.instance.getSavedMedicines(uid);
-      }
+      savedMedicines = await savedMedicinesFuture;
+
+      if (generation != _searchGeneration) return;
 
       _results = SymptomMatchService.instance.findMedicines(
         selectedSymptoms: _selectedSymptoms,
@@ -68,10 +82,14 @@ class SymptomCheckerProvider extends ChangeNotifier {
         mode: _mode,
       );
     } catch (_) {
-      _results = [];
+      if (generation == _searchGeneration) {
+        _results = [];
+      }
+    } finally {
+      if (generation == _searchGeneration) {
+        _isSearching = false;
+        notifyListeners();
+      }
     }
-
-    _isSearching = false;
-    notifyListeners();
   }
 }

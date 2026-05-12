@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
@@ -116,10 +117,25 @@ class LocalCacheService {
     await batch.commit(noResult: true);
   }
 
+  Future<void> clearLocalCache() async {
+    final db = _db;
+    _db = null;
+    try {
+      await db?.close();
+    } catch (_) {}
+
+    final dbPath = await getDatabasesPath();
+    final path = p.join(dbPath, 'mediscan.db');
+    try {
+      await deleteDatabase(path);
+    } catch (_) {}
+  }
+
   Future<MedicineModel?> searchLocal(String query) async {
     if (query.trim().isEmpty) return null;
     final db = await _database;
     final q = query.toLowerCase().trim();
+    AppLogger.info('LocalCache.searchLocal — q=$q');
 
     // Exact brand name match first
     List<Map<String, dynamic>> rows = await db.query(
@@ -139,28 +155,30 @@ class LocalCacheService {
       );
     }
 
-    // Then LIKE search on brand
+    // Then strict whole-word brand match only.
     if (rows.isEmpty) {
       rows = await db.query(
         'medicines',
-        where: 'LOWER(brand_name) LIKE ?',
-        whereArgs: ['%$q%'],
+        where: 'LOWER(brand_name) LIKE ? OR LOWER(brand_name) LIKE ?',
+        whereArgs: ['$q %', '% $q'],
         limit: 1,
       );
     }
 
-    // Then keywords / aliases
+    // Then strict keyword / alias whole-token matching only.
     if (rows.isEmpty) {
       rows = await db.rawQuery(
         '''SELECT * FROM medicines
-           WHERE search_keywords LIKE ? OR aliases LIKE ?
+           WHERE search_keywords LIKE ? OR search_keywords LIKE ? OR search_keywords LIKE ?
+              OR aliases LIKE ? OR aliases LIKE ? OR aliases LIKE ?
            LIMIT 1''',
-        ['%$q%', '%$q%'],
+        ['%$q %', '% $q %', '% $q', '%$q %', '% $q %', '% $q'],
       );
     }
 
     if (rows.isEmpty) return null;
     final blob = rows.first['json_blob'] as String;
+    AppLogger.info('LocalCache.searchLocal matched id=${json.decode(blob)['id']} brand=${json.decode(blob)['brand_name']}');
     return MedicineModel.fromJson(json.decode(blob) as Map<String, dynamic>);
   }
 
@@ -177,7 +195,8 @@ class LocalCacheService {
     if (query.trim().isEmpty) return [];
     final db = await _database;
     final q = query.toLowerCase().trim();
-    final rows = await db.rawQuery(
+     AppLogger.info('LocalCache.searchMedicines — q=$q');
+     final rows = await db.rawQuery(
       '''SELECT * FROM medicines
          WHERE LOWER(brand_name) LIKE ? OR LOWER(generic_name) LIKE ?
             OR search_keywords LIKE ? OR aliases LIKE ?

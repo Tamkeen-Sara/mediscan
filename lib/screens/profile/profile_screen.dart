@@ -7,7 +7,9 @@ import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../services/local_cache_service.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -23,119 +25,206 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.all(AppDimensions.pagePadding),
         children: [
           // User card — reactive to auth state changes
-          StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
-            builder: (context, snapshot) {
-              final user = snapshot.data;
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppDimensions.cardPadding),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: AppDimensions.avatarSM,
-                        backgroundColor: isDark
-                            ? AppColors.infoBlueTintDark
-                            : AppColors.primaryBlueLight,
-                        child: const Icon(Icons.person,
-                            color: AppColors.primaryBlue),
-                      ),
-                      const SizedBox(width: AppDimensions.spaceMD),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?.displayName ??
-                                  user?.email ??
-                                  tr(AppStrings.guestUser),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(fontWeight: FontWeight.bold),
+          FadeInCard(
+            delay: const Duration(milliseconds: 80),
+            child: StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                final user = snapshot.data;
+                final isGuest = user == null || user.isAnonymous;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: AppDimensions.avatarSM,
+                          backgroundColor: isGuest
+                              ? (isDark ? AppColors.infoBlueTintDark : AppColors.primaryBlueLight)
+                              : (isDark ? AppColors.infoBlueTintDark : AppColors.primaryBlueLight),
+                          child: Icon(
+                            isGuest ? Icons.person_outline : Icons.person,
+                            color: AppColors.primaryBlue,
+                          ),
+                        ),
+                        const SizedBox(width: AppDimensions.spaceMD),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      user?.displayName ??
+                                          user?.email ??
+                                          tr(AppStrings.guestUser),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isGuest)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: AppDimensions.spaceXS),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppDimensions.spaceXS,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? AppColors.infoBlueTintDark : AppColors.primaryBlueLight,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          'Guest',
+                                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                            color: AppColors.primaryBlue,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (user?.email != null)
+                                Text(user!.email!,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                    overflow: TextOverflow.ellipsis),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppDimensions.spaceMD),
+                    SizedBox(
+                      width: double.infinity,
+                      child: isGuest
+                          ? ElevatedButton(
+                              onPressed: () => Navigator.pushNamed(context, '/signin'),
+                              child: Text(tr(AppStrings.signIn)),
+                            )
+                          : ElevatedButton(
+                              onPressed: () => _signOut(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.statusRed.withValues(alpha: 0.1),
+                              ),
+                              child: Text(
+                                tr(AppStrings.signOut),
+                                style: const TextStyle(color: AppColors.statusRed),
+                              ),
                             ),
-                            if (user?.email != null)
-                              Text(user!.email!,
-                                  style:
-                                      Theme.of(context).textTheme.bodySmall),
-                          ],
-                        ),
-                      ),
-                      if (user != null && !user.isAnonymous)
-                        TextButton(
-                          onPressed: () => _signOut(context),
-                          child: Text(tr(AppStrings.signOut),
-                              style: const TextStyle(
-                                  color: AppColors.statusRed)),
-                        )
-                      else
-                        TextButton(
-                          onPressed: () =>
-                              Navigator.pushNamed(context, '/signin'),
-                          child: Text(tr(AppStrings.signIn)),
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
           const SizedBox(height: AppDimensions.spaceLG),
 
           // Appearance
           _SectionHeader(tr(AppStrings.appearanceSection)),
-          _SettingsTile(
-            icon: Icons.palette_outlined,
-            title: tr(AppStrings.themeTitle),
-            subtitle: _themeLabel(
-                context.watch<ThemeProvider>().themeMode, tr),
-            onTap: () => _showThemeSheet(context),
+          FadeInCard(
+            delay: const Duration(milliseconds: 140),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.palette_outlined,
+              title: tr(AppStrings.themeTitle),
+              subtitle: _themeLabel(context.watch<ThemeProvider>().themeMode, tr),
+              onTap: () => _showThemeSheet(context),
+            ),
           ),
-          _SettingsTile(
-            icon: Icons.language,
-            title: tr(AppStrings.languageTitle),
-            subtitle: context.watch<LanguageProvider>().isRTL
-                ? tr(AppStrings.languageUrdu)
-                : tr(AppStrings.languageEnglish),
-            onTap: () => _showLanguageSheet(context),
+          const SizedBox(height: AppDimensions.spaceSM),
+          FadeInCard(
+            delay: const Duration(milliseconds: 190),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.language,
+              title: tr(AppStrings.languageTitle),
+              subtitle: context.watch<LanguageProvider>().isRTL
+                  ? tr(AppStrings.languageUrdu)
+                  : tr(AppStrings.languageEnglish),
+              onTap: () => _showLanguageSheet(context),
+            ),
           ),
           const SizedBox(height: AppDimensions.spaceLG),
 
           // Data & Privacy
           _SectionHeader(tr(AppStrings.dataSection)),
-          _SettingsTile(
-            icon: Icons.bookmark_outline,
-            title: tr(AppStrings.savedTitle),
-            onTap: () => Navigator.pushNamed(context, '/saved-medicines'),
+          FadeInCard(
+            delay: const Duration(milliseconds: 240),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.bookmark_outline,
+              title: tr(AppStrings.savedTitle),
+              onTap: () => Navigator.pushNamed(context, '/saved-medicines'),
+            ),
           ),
-          _SettingsTile(
-            icon: Icons.smart_toy_outlined,
-            title: tr(AppStrings.aiPrefsTitle),
-            onTap: () => Navigator.pushNamed(context, '/ai-prefs'),
+          const SizedBox(height: AppDimensions.spaceSM),
+          FadeInCard(
+            delay: const Duration(milliseconds: 290),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.smart_toy_outlined,
+              title: tr(AppStrings.aiPrefsTitle),
+              onTap: () => Navigator.pushNamed(context, '/ai-prefs'),
+            ),
           ),
-          _SettingsTile(
-            icon: Icons.lock_outline,
-            title: tr(AppStrings.privacyTitle),
-            onTap: () => Navigator.pushNamed(context, '/privacy'),
+          const SizedBox(height: AppDimensions.spaceSM),
+          FadeInCard(
+            delay: const Duration(milliseconds: 340),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.lock_outline,
+              title: tr(AppStrings.privacyTitle),
+              onTap: () => Navigator.pushNamed(context, '/privacy'),
+            ),
+          ),
+          const SizedBox(height: AppDimensions.spaceSM),
+          FadeInCard(
+            delay: const Duration(milliseconds: 365),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.delete_outline,
+              title: tr(AppStrings.clearLocalCache),
+              subtitle: tr(AppStrings.clearLocalCacheDesc),
+              onTap: () => _clearLocalCache(context),
+            ),
           ),
           const SizedBox(height: AppDimensions.spaceLG),
 
           // Support
           _SectionHeader(tr(AppStrings.supportSection)),
-          _SettingsTile(
-            icon: Icons.info_outline,
-            title: tr(AppStrings.aboutTitle),
-            onTap: () => Navigator.pushNamed(context, '/about'),
+          FadeInCard(
+            delay: const Duration(milliseconds: 390),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.info_outline,
+              title: tr(AppStrings.aboutTitle),
+              onTap: () => Navigator.pushNamed(context, '/about'),
+            ),
           ),
-          _SettingsTile(
-            icon: Icons.feedback_outlined,
-            title: tr(AppStrings.feedbackTitle),
-            onTap: () => Navigator.pushNamed(context, '/feedback'),
+          const SizedBox(height: AppDimensions.spaceSM),
+          FadeInCard(
+            delay: const Duration(milliseconds: 440),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.feedback_outlined,
+              title: tr(AppStrings.feedbackTitle),
+              onTap: () => Navigator.pushNamed(context, '/feedback'),
+            ),
           ),
-          _SettingsTile(
-            icon: Icons.share_outlined,
-            title: tr(AppStrings.shareAppTitle),
-            onTap: () => Navigator.pushNamed(context, '/share'),
+          const SizedBox(height: AppDimensions.spaceSM),
+          FadeInCard(
+            delay: const Duration(milliseconds: 490),
+            padding: EdgeInsets.zero,
+            child: _SettingsTile(
+              icon: Icons.share_outlined,
+              title: tr(AppStrings.shareAppTitle),
+              onTap: () => Navigator.pushNamed(context, '/share'),
+            ),
           ),
         ],
       ),
@@ -240,6 +329,42 @@ class ProfileScreen extends StatelessWidget {
       try {
         await FirebaseAuth.instance.signInAnonymously();
       } catch (_) {}
+    }
+  }
+
+  Future<void> _clearLocalCache(BuildContext ctx) async {
+    final confirm = await showDialog<bool>(
+      context: ctx,
+      builder: (dialogCtx) {
+        final t = TranslationService.instance.tr;
+        return AlertDialog(
+          title: Text(t(AppStrings.clearLocalCache)),
+          content: Text(t(AppStrings.clearLocalCacheConfirm)),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, false),
+                child: Text(t(AppStrings.cancel))),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, true),
+                child: Text(t(AppStrings.clear),
+                    style: const TextStyle(color: AppColors.statusRed))),
+          ],
+        );
+      },
+    );
+    if (confirm != true) return;
+
+    final messenger = ScaffoldMessenger.of(ctx);
+    try {
+      await LocalCacheService.instance.clearLocalCache();
+      await LocalCacheService.instance.seedIfEmpty();
+      messenger.showSnackBar(
+        SnackBar(content: Text(TranslationService.instance.tr(AppStrings.clearLocalCacheDone))),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(TranslationService.instance.tr(AppStrings.unknownError))),
+      );
     }
   }
 

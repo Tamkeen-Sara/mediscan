@@ -12,13 +12,16 @@ import 'providers/history_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/symptom_checker_provider.dart';
 import 'providers/preferences_provider.dart';
+import 'utils/animation_utils.dart';
 
 import 'screens/splash/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/main/main_screen.dart';
 import 'screens/scanner/processing_screen.dart';
+import 'screens/scanner/prescription_processing_screen.dart';
 import 'screens/scanner/scan_failed_screen.dart';
 import 'screens/results/scan_results_screen.dart';
+import 'screens/results/prescription_results_screen.dart';
 import 'screens/results/confidence_screen.dart';
 import 'screens/results/manual_edit_screen.dart';
 import 'screens/ai_chat/ai_chat_screen.dart';
@@ -30,6 +33,8 @@ import 'screens/profile/privacy_screen.dart';
 import 'screens/profile/ai_preferences_screen.dart';
 import 'screens/profile/share_app_screen.dart';
 import 'screens/auth/sign_in_screen.dart';
+import 'screens/scanner/prescription_upload_screen.dart';
+import 'models/prescription_models.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -108,6 +113,7 @@ class MediScanApp extends StatelessWidget {
             '/privacy': (_) => const PrivacyScreen(),
             '/ai-prefs': (_) => const AiPreferencesScreen(),
             '/share': (_) => const ShareAppScreen(),
+            '/prescription': (_) => const PrescriptionUploadScreen(),
           },
         );
       },
@@ -119,15 +125,35 @@ class MediScanApp extends StatelessWidget {
       case '/processing':
         // imagePath is null for manual-text scans (no camera image).
         final path = settings.arguments as String?;
-        return MaterialPageRoute(
+        return SmoothPageRoute(
           builder: (_) => ProcessingScreen(imagePath: path),
+          settings: settings,
+        );
+      case '/prescription-processing':
+        final path = settings.arguments as String?;
+        if (path == null) return null;
+        return SmoothPageRoute(
+          builder: (_) => PrescriptionProcessingScreen(imagePath: path),
           settings: settings,
         );
       case '/results':
         final args = settings.arguments as Map<String, dynamic>?;
         final isInfoMode = args?['isInfoMode'] as bool? ?? false;
-        return MaterialPageRoute(
+        return SmoothPageRoute(
           builder: (_) => ScanResultsScreen(isInfoMode: isInfoMode),
+          settings: settings,
+        );
+      case '/prescription':
+        final imagePath = settings.arguments as String?;
+        return SmoothPageRoute(
+          builder: (_) => PrescriptionUploadScreen(initialImagePath: imagePath),
+          settings: settings,
+        );
+      case '/prescription-results':
+        final analysis = settings.arguments as PrescriptionAnalysisResult?;
+        if (analysis == null) return null;
+        return SmoothPageRoute(
+          builder: (_) => PrescriptionResultsScreen(analysisResult: analysis),
           settings: settings,
         );
     }

@@ -8,6 +8,7 @@ import '../../providers/history_provider.dart';
 import '../../providers/scan_provider.dart';
 import '../../services/local_cache_service.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 import '../../widgets/scan_history_card.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -24,8 +25,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HistoryProvider>().init();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<HistoryProvider>().init();
     });
   }
 
@@ -187,10 +188,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             color: AppColors.white),
                       ),
                       onDismissed: (_) => provider.deleteItem(item.id),
-                      child: ScanHistoryCard(
-                        item: item,
-                        onTap: () => _openItem(ctx, item),
-                        onFavourite: () => provider.toggleFavourite(item),
+                      child: FadeInCard(
+                        delay: Duration(milliseconds: 70 * i),
+                        padding: EdgeInsets.zero,
+                        child: ScanHistoryCard(
+                          item: item,
+                          onTap: () => _openItem(ctx, item),
+                          onFavourite: () => provider.toggleFavourite(item),
+                        ),
                       ),
                     );
                   },

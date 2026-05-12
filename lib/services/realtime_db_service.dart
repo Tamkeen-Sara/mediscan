@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../utils/app_logger.dart';
 import 'package:firebase_database/firebase_database.dart';
 import '../models/medicine_model.dart';
 import '../models/scan_history_model.dart';
@@ -16,6 +17,7 @@ class RealtimeDatabaseService {
 
   Future<MedicineModel?> getMedicineById(String id) async {
     try {
+      AppLogger.info('RTDB getMedicineById — id=$id');
       final snap = await _db.ref('medicines/$id').get();
       if (!snap.exists || snap.value == null) return null;
       final map = Map<String, dynamic>.from(snap.value as Map);
@@ -27,6 +29,7 @@ class RealtimeDatabaseService {
 
   Future<MedicineModel?> getMedicineByName(String name) async {
     try {
+      AppLogger.info('RTDB getMedicineByName — name=$name');
       final snap = await _db
           .ref('medicines')
           .orderByChild('brandName')
@@ -47,6 +50,7 @@ class RealtimeDatabaseService {
     final q = query.trim();
     if (q.isEmpty) return [];
     try {
+      AppLogger.info('RTDB searchMedicines — q=$q');
       // Use indexed prefix queries instead of downloading the whole node.
       // Requires ".indexOn": ["brandName", "genericName"] in DB rules.
       //
@@ -58,19 +62,20 @@ class RealtimeDatabaseService {
 
       const timeout = Duration(seconds: 5);
 
-      for (final key in [qCapital, q]) {
-        final endKey = '$key\uf8ff';
+        final allowPrefixSearch = q.length >= 5;
 
+      for (final key in [qCapital, q]) {
         final brandSnap = await _db
             .ref('medicines')
-            .orderByChild('brandName')
-            .startAt(key)
-            .endAt(endKey)
+          .orderByChild('brandName')
+          .startAt(key)
+          .endAt(allowPrefixSearch ? '$key\uf8ff' : key)
             .limitToFirst(3)
             .get()
             .timeout(timeout, onTimeout: () => throw TimeoutException(''));
 
         if (brandSnap.exists && brandSnap.value != null) {
+          AppLogger.info('RTDB brandSnap matched for key=$key');
           final map = Map<String, dynamic>.from(brandSnap.value as Map);
           final results = map.values
               .map((v) =>
@@ -82,13 +87,14 @@ class RealtimeDatabaseService {
         final genericSnap = await _db
             .ref('medicines')
             .orderByChild('genericName')
-            .startAt(key)
-            .endAt(endKey)
+          .startAt(key)
+          .endAt(allowPrefixSearch ? '$key\uf8ff' : key)
             .limitToFirst(3)
             .get()
             .timeout(timeout, onTimeout: () => throw TimeoutException(''));
 
         if (genericSnap.exists && genericSnap.value != null) {
+          AppLogger.info('RTDB genericSnap matched for key=$key');
           final map = Map<String, dynamic>.from(genericSnap.value as Map);
           final results = map.values
               .map((v) =>

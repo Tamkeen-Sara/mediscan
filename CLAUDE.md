@@ -12,7 +12,7 @@ Scan a medicine label → OCR extracts text → identify medicine → Gemini AI 
 | Framework | Flutter 3.3+ / Dart |
 | State management | Provider (`ChangeNotifier`) |
 | Backend / Auth | Firebase Realtime Database + Firebase Auth |
-| AI | Google Generative AI (`gemini-2.0-flash`) |
+| AI | Google Generative AI (`gemini-3.1-flash-lite-preview`) |
 | OCR | Google ML Kit — Latin script only |
 | Local DB | SQLite via `sqflite` (seeded from `assets/database/medicines.json`) |
 | Medicine API | OpenFDA (US medicines fallback) |
@@ -189,7 +189,7 @@ and rebuilds the entire tree. RTL layout is applied via `Directionality` in `mai
 
 ## Gemini AI
 
-- Model: `gemini-2.0-flash` (defined in `GeminiService._modelId`)
+- Model: `gemini-3.1-flash-lite-preview` (defined in `GeminiService._modelId`)
 - To change model: edit `lib/services/gemini_service.dart` line ~30.
   Get exact model IDs from https://aistudio.google.com/models
 - Key must have **Generative Language API** enabled in Google Cloud Console.

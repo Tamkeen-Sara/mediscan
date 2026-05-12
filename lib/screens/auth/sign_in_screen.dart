@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_strings.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -210,58 +211,70 @@ class _SignInScreenState extends State<SignInScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Logo
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: const BoxDecoration(
-                      color: AppColors.primaryBlue,
-                      shape: BoxShape.circle,
+                  FadeInCard(
+                    delay: const Duration(milliseconds: 60),
+                    padding: EdgeInsets.zero,
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primaryBlue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.medical_services_outlined,
+                              color: AppColors.white, size: 36),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'MediScan',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryBlue,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _isLogin
+                              ? tr(AppStrings.signIn)
+                              : tr(AppStrings.createAccount),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.medical_services_outlined,
-                        color: AppColors.white, size: 36),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'MediScan',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryBlue,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isLogin
-                        ? tr(AppStrings.signIn)
-                        : tr(AppStrings.createAccount),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
                   ),
                   const SizedBox(height: 32),
 
                   // Google Sign-In
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: OutlinedButton.icon(
-                      onPressed: _loading ? null : _signInWithGoogle,
-                      style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        side: BorderSide(
-                            color: isDark
-                                ? AppColors.dividerDark
-                                : AppColors.dividerLight),
+                  FadeInCard(
+                    delay: const Duration(milliseconds: 120),
+                    padding: EdgeInsets.zero,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton.icon(
+                        onPressed: _loading ? null : _signInWithGoogle,
+                        style: OutlinedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          side: BorderSide(
+                              color: isDark
+                                  ? AppColors.dividerDark
+                                  : AppColors.dividerLight),
+                        ),
+                        icon: const Icon(Icons.g_mobiledata,
+                            size: 28, color: AppColors.primaryBlue),
+                        label: Text(tr(AppStrings.signInWithGoogle)),
                       ),
-                      icon: const Icon(Icons.g_mobiledata,
-                          size: 28, color: AppColors.primaryBlue),
-                      label: Text(tr(AppStrings.signInWithGoogle)),
                     ),
                   ),
                   const Padding(
@@ -278,50 +291,58 @@ class _SignInScreenState extends State<SignInScreen> {
                   ),
 
                   // Email
-                  TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: tr(AppStrings.email),
-                      prefixIcon: const Icon(Icons.email_outlined),
+                  FadeInCard(
+                    delay: const Duration(milliseconds: 180),
+                    padding: EdgeInsets.zero,
+                    child: TextFormField(
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: InputDecoration(
+                        labelText: tr(AppStrings.email),
+                        prefixIcon: const Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Email is required.';
+                        }
+                        if (!v.contains('@')) return 'Enter a valid email.';
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Email is required.';
-                      }
-                      if (!v.contains('@')) return 'Enter a valid email.';
-                      return null;
-                    },
                   ),
                   const SizedBox(height: 16),
 
                   // Password
-                  TextFormField(
-                    controller: _passwordCtrl,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: InputDecoration(
-                      labelText: tr(AppStrings.password),
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword
-                            ? Icons.visibility_off_outlined
-                            : Icons.visibility_outlined),
-                        onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword),
+                  FadeInCard(
+                    delay: const Duration(milliseconds: 230),
+                    padding: EdgeInsets.zero,
+                    child: TextFormField(
+                      controller: _passwordCtrl,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submit(),
+                      decoration: InputDecoration(
+                        labelText: tr(AppStrings.password),
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
+                        ),
                       ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) {
+                          return 'Password is required.';
+                        }
+                        if (!_isLogin && v.length < 6) {
+                          return 'Password must be at least 6 characters.';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (v == null || v.isEmpty) {
-                        return 'Password is required.';
-                      }
-                      if (!_isLogin && v.length < 6) {
-                        return 'Password must be at least 6 characters.';
-                      }
-                      return null;
-                    },
                   ),
 
                   // Forgot password
@@ -338,25 +359,29 @@ class _SignInScreenState extends State<SignInScreen> {
                   // Error banner
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.statusRedTintDark,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.error_outline,
-                              color: AppColors.statusRed, size: 18),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(
-                                  color: AppColors.statusRed, fontSize: 13),
+                    FadeInCard(
+                      delay: const Duration(milliseconds: 280),
+                      padding: EdgeInsets.zero,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.statusRedTintDark,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline,
+                                color: AppColors.statusRed, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                    color: AppColors.statusRed, fontSize: 13),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -364,33 +389,36 @@ class _SignInScreenState extends State<SignInScreen> {
                   const SizedBox(height: 20),
 
                   // Submit button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primaryBlue,
-                        foregroundColor: AppColors.white,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                  FadeInCard(
+                    delay: const Duration(milliseconds: 330),
+                    padding: EdgeInsets.zero,
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _loading ? null : _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: AppColors.white,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: _loading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: AppColors.white),
+                              )
+                            : Text(
+                                _isLogin
+                                    ? tr(AppStrings.signIn)
+                                    : tr(AppStrings.createAccount),
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600),
+                              ),
                       ),
-                      child: _loading
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.white),
-                            )
-                          : Text(
-                              _isLogin
-                                  ? tr(AppStrings.signIn)
-                                  : tr(AppStrings.createAccount),
-                              style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600),
-                            ),
                     ),
                   ),
                   const SizedBox(height: 8),

@@ -10,6 +10,7 @@ import '../../providers/language_provider.dart';
 import '../../providers/scan_provider.dart';
 import '../../services/gemini_service.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 import '../../widgets/confidence_badge.dart';
 import '../../widgets/dosage_card.dart';
 import '../../widgets/emergency_card.dart';
@@ -20,10 +21,26 @@ import '../../widgets/suggested_questions_card.dart';
 import '../../widgets/symptom_chips_row.dart';
 import '../../widgets/save_success_dialog.dart';
 
-class ScanResultsScreen extends StatelessWidget {
+class ScanResultsScreen extends StatefulWidget {
   /// When true, shown from SymptomChecker "View Details" — no save button.
   final bool isInfoMode;
   const ScanResultsScreen({super.key, this.isInfoMode = false});
+
+  @override
+  State<ScanResultsScreen> createState() => _ScanResultsScreenState();
+}
+
+class _ScanResultsScreenState extends State<ScanResultsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final scan = context.read<ScanProvider>();
+      if (scan.summaryResult == null && scan.result?.medicine != null) {
+        scan.generateSummaryForCurrentMedicine();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,12 +82,16 @@ class ScanResultsScreen extends StatelessWidget {
     final med = result.medicine;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final summary = lang.isRTL
-        ? (summaryResult?.summaryUr.isNotEmpty == true
-            ? summaryResult!.summaryUr
-            : med.cachedSummaryUr ?? med.summaryUr)
-        : (summaryResult?.summaryEn ??
-            med.cachedSummaryEn ??
-            med.summaryEn);
+      ? (summaryResult?.summaryUr.isNotEmpty == true
+        ? summaryResult!.summaryUr
+        : (med.cachedSummaryUr?.isNotEmpty == true
+          ? med.cachedSummaryUr!
+          : med.summaryUr))
+      : (summaryResult?.summaryEn.isNotEmpty == true
+        ? summaryResult!.summaryEn
+        : (med.cachedSummaryEn?.isNotEmpty == true
+          ? med.cachedSummaryEn!
+          : med.summaryEn));
 
     return Scaffold(
       appBar: AppBar(
@@ -98,7 +119,7 @@ class ScanResultsScreen extends StatelessWidget {
             onPressed: () => _openChat(context, null),
           ),
           // ── Save ─────────────────────────────────────────────────────
-          if (!isInfoMode)
+          if (!widget.isInfoMode)
             IconButton(
               icon: Icon(
                 isSaved ? Icons.bookmark : Icons.bookmark_border,
@@ -153,91 +174,100 @@ class ScanResultsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(AppDimensions.pagePadding),
         children: [
           // ── Section 1: Identity header ───────────────────────────────
-          Card(
-            margin: const EdgeInsets.only(bottom: AppDimensions.spaceMD),
-            child: Padding(
-              padding: const EdgeInsets.all(AppDimensions.cardPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          med.displayName,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                        ),
+          FadeInCard(
+            delay: const Duration(milliseconds: 100),
+            padding: const EdgeInsets.all(AppDimensions.cardPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        med.displayName,
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                      ConfidenceBadge(
-                        status: result.scanStatus,
-                        label: '${result.confidencePercent}%',
-                      ),
-                    ],
-                  ),
-                  if (med.genericName.isNotEmpty &&
-                      med.genericName != med.brandName) ...[
-                    const SizedBox(height: AppDimensions.spaceXS),
-                    Text(
-                      '${tr(AppStrings.genericName)}: ${med.genericName}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
+                    ),
+                    ConfidenceBadge(
+                      status: result.scanStatus,
+                      label: '${result.confidencePercent}%',
                     ),
                   ],
-                  if (med.manufacturer.isNotEmpty) ...[
-                    const SizedBox(height: AppDimensions.spaceXXS),
-                    Text(
-                      '${tr(AppStrings.manufacturer)}: ${med.manufacturer}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                    ),
-                  ],
+                ),
+                if (med.genericName.isNotEmpty &&
+                    med.genericName != med.brandName) ...[
                   const SizedBox(height: AppDimensions.spaceXS),
-                  // ── OTC/Rx + Form badges ─────────────────────────────
-                  Wrap(
-                    spacing: AppDimensions.spaceXS,
-                    runSpacing: AppDimensions.spaceXS,
-                    children: [
-                      _BadgeChip(
-                        label: med.requiresPrescription
-                            ? tr(AppStrings.badgeRx)
-                            : tr(AppStrings.badgeOtc),
-                        color: med.requiresPrescription
-                            ? AppColors.accentOrange
-                            : AppColors.statusGreen,
-                        isDark: isDark,
-                      ),
-                      if (med.dosageForm.isNotEmpty)
-                        _BadgeChip(
-                          label: med.dosageForm,
-                          color: AppColors.primaryBlue,
-                          isDark: isDark,
+                  Text(
+                    '${tr(AppStrings.genericName)}: ${med.genericName}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
                         ),
-                      if (med.category.isNotEmpty)
-                        _BadgeChip(
-                          label: med.category,
-                          color: AppColors.primaryBlue,
-                          isDark: isDark,
-                        ),
-                    ],
                   ),
                 ],
-              ),
+                if (med.manufacturer.isNotEmpty) ...[
+                  const SizedBox(height: AppDimensions.spaceXXS),
+                  Text(
+                    '${tr(AppStrings.manufacturer)}: ${med.manufacturer}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                  ),
+                ],
+                const SizedBox(height: AppDimensions.spaceXS),
+                // ── OTC/Rx + Form badges ─────────────────────────────
+                Wrap(
+                  spacing: AppDimensions.spaceXS,
+                  runSpacing: AppDimensions.spaceXS,
+                  children: [
+                    _BadgeChip(
+                      label: med.requiresPrescription
+                          ? tr(AppStrings.badgeRx)
+                          : tr(AppStrings.badgeOtc),
+                      color: med.requiresPrescription
+                          ? AppColors.accentOrange
+                          : AppColors.statusGreen,
+                      isDark: isDark,
+                    ),
+                    if (med.dosageForm.isNotEmpty)
+                      _BadgeChip(
+                        label: med.dosageForm,
+                        color: AppColors.primaryBlue,
+                        isDark: isDark,
+                      ),
+                    if (med.category.isNotEmpty)
+                      _BadgeChip(
+                        label: med.category,
+                        color: AppColors.primaryBlue,
+                        isDark: isDark,
+                      ),
+                    if (result.source != null && result.source!.isNotEmpty)
+                      _BadgeChip(
+                        label: 'Source: ${result.source}',
+                        color: AppColors.accentOrange.withValues(alpha: 0.7),
+                        isDark: isDark,
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
 
+          const SizedBox(height: AppDimensions.spaceMD),
+
           // ── Section 2: AI summary ────────────────────────────────────
-          PlainLanguageSummaryCard(
-            summary: summary.isNotEmpty ? summary : null,
-            isLoading: phase == ScanPhase.processing && summary.isEmpty,
+          FadeInCard(
+            delay: const Duration(milliseconds: 200),
+            child: PlainLanguageSummaryCard(
+              summary: summary.isNotEmpty ? summary : null,
+              isLoading: phase == ScanPhase.processing && summary.isEmpty,
+            ),
           ),
 
           // ── Section 3: Symptom chips ─────────────────────────────────
@@ -257,52 +287,67 @@ class ScanResultsScreen extends StatelessWidget {
           if (med.dosageAdults.isNotEmpty ||
               med.dosageChildren.isNotEmpty ||
               med.maxDailyDose.isNotEmpty)
-            DosageCard(medicine: med),
+            FadeInCard(
+              delay: const Duration(milliseconds: 300),
+              child: DosageCard(medicine: med),
+            ),
 
           // ── Section 5: Safety ────────────────────────────────────────
           if (med.warningsPlain.isNotEmpty ||
               med.warnings.isNotEmpty ||
               med.sideEffects.isNotEmpty)
-            SafetyCard(medicine: med),
+            FadeInCard(
+              delay: const Duration(milliseconds: 350),
+              child: SafetyCard(medicine: med),
+            ),
 
           // ── Section 6: Onset + Storage ───────────────────────────────
           if (med.onsetTime.isNotEmpty || med.storageInstructions.isNotEmpty)
-            MediInfoCard(
-              title: '',
-              titleIcon: Icons.access_time_outlined,
-              rows: [
-                if (med.onsetTime.isNotEmpty)
-                  InfoRow(
-                    label: tr(AppStrings.onsetLabel),
-                    value: med.onsetTime,
-                    icon: Icons.timer_outlined,
-                  ),
+            FadeInCard(
+              delay: const Duration(milliseconds: 400),
+              child: MediInfoCard(
+                title: '',
+                titleIcon: Icons.access_time_outlined,
+                rows: [
+                  if (med.onsetTime.isNotEmpty)
+                    InfoRow(
+                      label: tr(AppStrings.onsetLabel),
+                      value: med.onsetTime,
+                      icon: Icons.timer_outlined,
+                    ),
                 if (med.storageInstructions.isNotEmpty)
                   InfoRow(
                     label: tr(AppStrings.storageLabel),
                     value: med.storageInstructions,
                     icon: Icons.thermostat_outlined,
                   ),
-              ],
+                ],
+              ),
             ),
 
           // ── Section 7: Suggested questions ──────────────────────────
           if (suggestedQuestions.isNotEmpty ||
               phase == ScanPhase.processing)
-            SuggestedQuestionsCard(
-              questions: suggestedQuestions,
-              isLoading: suggestedQuestions.isEmpty &&
-                  phase == ScanPhase.processing,
-              onQuestionTap: (q) => _openChat(context, q),
+            FadeInCard(
+              delay: const Duration(milliseconds: 450),
+              child: SuggestedQuestionsCard(
+                questions: suggestedQuestions,
+                isLoading: suggestedQuestions.isEmpty &&
+                    phase == ScanPhase.processing,
+                onQuestionTap: (q) => _openChat(context, q),
+              ),
             ),
 
           // ── Section 8: Emergency ─────────────────────────────────────
-          const EmergencyCard(),
+          const FadeInCard(
+            delay: Duration(milliseconds: 500),
+            child: EmergencyCard(),
+          ),
 
           const SizedBox(height: AppDimensions.spaceLG),
 
           // ── Bottom action buttons ────────────────────────────────────
-          if (!isInfoMode && !isSaved)
+          if (!widget.isInfoMode && !isSaved)
             SizedBox(
               width: double.infinity,
               height: AppDimensions.buttonHeightLG,
@@ -312,7 +357,7 @@ class ScanResultsScreen extends StatelessWidget {
                 onPressed: () => _saveMedicine(context, tr),
               ),
             ),
-          if (!isInfoMode && !isSaved)
+          if (!widget.isInfoMode && !isSaved)
             const SizedBox(height: AppDimensions.spaceSM),
 
           Row(

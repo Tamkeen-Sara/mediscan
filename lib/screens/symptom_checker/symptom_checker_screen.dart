@@ -9,6 +9,7 @@ import '../../providers/scan_provider.dart';
 import '../../providers/symptom_checker_provider.dart';
 import '../../services/symptom_match_service.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 import '../../widgets/medicine_result_card.dart';
 
 class SymptomCheckerScreen extends StatefulWidget {
@@ -18,11 +19,7 @@ class SymptomCheckerScreen extends StatefulWidget {
   State<SymptomCheckerScreen> createState() => _SymptomCheckerScreenState();
 }
 
-class _SymptomCheckerScreenState extends State<SymptomCheckerScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _slideCtrl;
-  late final Animation<Offset> _slideAnim;
-  late final Animation<double> _fadeAnim;
+class _SymptomCheckerScreenState extends State<SymptomCheckerScreen> {
 
   // All 26 symptom keys mapped to display strings via tr()
   static const _symptoms = [
@@ -55,34 +52,19 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen>
   ];
 
   int _lastResultCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _slideCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.25),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut));
-    _fadeAnim = CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut);
-  }
-
-  @override
-  void dispose() {
-    _slideCtrl.dispose();
-    super.dispose();
-  }
+  bool _symptomPanelExpanded = true;
 
   void _onResultsChanged(List<dynamic> results) {
     if (results.isNotEmpty && _lastResultCount == 0) {
-      _slideCtrl.forward(from: 0);
-    } else if (results.isEmpty) {
-      _slideCtrl.reverse();
+      if (_symptomPanelExpanded) {
+        setState(() => _symptomPanelExpanded = false);
+      }
     }
     _lastResultCount = results.length;
+  }
+
+  void _toggleSymptomPanel() {
+    setState(() => _symptomPanelExpanded = !_symptomPanelExpanded);
   }
 
   @override
@@ -135,62 +117,98 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen>
             ),
           ),
 
-          // Selection count
-          if (checker.hasSelections)
-            Padding(
+          // Symptom chooser panel
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeInOut,
+            child: Padding(
               padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimensions.pagePadding,
-                  vertical: AppDimensions.spaceSM),
-              child: Row(
+                  horizontal: AppDimensions.pagePadding),
+              child: Column(
                 children: [
-                  const Icon(Icons.check_circle,
-                      size: AppDimensions.iconSM,
-                      color: AppColors.primaryBlue),
-                  const SizedBox(width: AppDimensions.spaceXS),
-                  Text(
-                    '${checker.selectionCount} ${tr(AppStrings.checkerSymptomsSelected)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.primaryBlue,
-                          fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      if (checker.hasSelections)
+                        const Padding(
+                          padding: EdgeInsets.only(
+                              right: AppDimensions.spaceXS),
+                          child: Icon(Icons.check_circle,
+                              size: AppDimensions.iconSM,
+                              color: AppColors.primaryBlue),
                         ),
+                      Expanded(
+                        child: Text(
+                          checker.hasSelections
+                              ? '${checker.selectionCount} ${tr(AppStrings.checkerSymptomsSelected)}'
+                              : tr(AppStrings.checkerSelectSymptoms),
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _toggleSymptomPanel,
+                        icon: _symptomPanelExpanded
+                            ? const Icon(Icons.keyboard_arrow_up)
+                            : const Icon(Icons.keyboard_arrow_down),
+                        label: Text(
+                          _symptomPanelExpanded
+                              ? 'Hide'
+                              : 'Show',
+                        ),
+                      ),
+                    ],
                   ),
+                  if (_symptomPanelExpanded) ...[
+                    const SizedBox(height: AppDimensions.spaceSM),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: checker.results.isNotEmpty ? 140 : 240,
+                      ),
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        child: SingleChildScrollView(
+                          child: Wrap(
+                            spacing: AppDimensions.symptomChipSpacing,
+                            runSpacing: AppDimensions.symptomChipRunSpacing,
+                            children: _symptoms.map((key) {
+                              final label = tr(key);
+                              final selected = checker.selectedSymptoms.contains(label);
+                              return FilterChip(
+                                label: Text(label),
+                                selected: selected,
+                                onSelected: (_) => context
+                                    .read<SymptomCheckerProvider>()
+                                    .toggleSymptom(label),
+                                selectedColor: isDark
+                                    ? AppColors.chipGreenTintDark
+                                    : AppColors.chipGreenTint,
+                                checkmarkColor: AppColors.chipGreen,
+                                labelStyle:
+                                    Theme.of(context).textTheme.labelMedium?.copyWith(
+                                          color:
+                                              selected ? AppColors.chipGreen : null,
+                                          fontWeight: selected
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                        ),
+                                side: BorderSide(
+                                  color: selected
+                                      ? AppColors.chipGreen
+                                      : (isDark
+                                          ? AppColors.dividerDark
+                                          : AppColors.dividerLight),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
-            ),
-
-          // Symptom chips
-          Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppDimensions.pagePadding),
-            child: Wrap(
-              spacing: AppDimensions.symptomChipSpacing,
-              runSpacing: AppDimensions.symptomChipRunSpacing,
-              children: _symptoms.map((key) {
-                final label = tr(key);
-                final selected = checker.selectedSymptoms.contains(label);
-                return FilterChip(
-                  label: Text(label),
-                  selected: selected,
-                  onSelected: (_) => context
-                      .read<SymptomCheckerProvider>()
-                      .toggleSymptom(label),
-                  selectedColor:
-                      isDark ? AppColors.chipGreenTintDark : AppColors.chipGreenTint,
-                  checkmarkColor: AppColors.chipGreen,
-                  labelStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: selected ? AppColors.chipGreen : null,
-                        fontWeight:
-                            selected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                  side: BorderSide(
-                    color: selected
-                        ? AppColors.chipGreen
-                        : (isDark
-                            ? AppColors.dividerDark
-                            : AppColors.dividerLight),
-                  ),
-                );
-              }).toList(),
             ),
           ),
 
@@ -257,25 +275,22 @@ class _SymptomCheckerScreenState extends State<SymptomCheckerScreen>
                               ],
                             ),
                           )
-                        : SlideTransition(
-                            position: _slideAnim,
-                            child: FadeTransition(
-                              opacity: _fadeAnim,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(
-                                    AppDimensions.pagePadding),
-                                itemCount: checker.results.length,
-                                itemBuilder: (ctx, i) {
-                                  final r = checker.results[i];
-                                  return MedicineResultCard(
-                                    result: r,
-                                    onViewDetails: () =>
-                                        _viewDetails(ctx, r),
-                                    onAskAI: () => _askAI(ctx, r),
-                                  );
-                                },
-                              ),
-                            ),
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(
+                                AppDimensions.pagePadding),
+                            itemCount: checker.results.length,
+                            itemBuilder: (ctx, i) {
+                              final r = checker.results[i];
+                              return FadeInCard(
+                                delay: Duration(milliseconds: 70 * i),
+                                padding: EdgeInsets.zero,
+                                child: MedicineResultCard(
+                                  result: r,
+                                  onViewDetails: () => _viewDetails(ctx, r),
+                                  onAskAI: () => _askAI(ctx, r),
+                                ),
+                              );
+                            },
                           ),
           ),
         ],

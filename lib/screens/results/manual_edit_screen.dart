@@ -5,6 +5,7 @@ import '../../constants/app_strings.dart';
 import '../../models/medicine_model.dart';
 import '../../providers/scan_provider.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 
 class ManualEditScreen extends StatefulWidget {
   const ManualEditScreen({super.key});
@@ -88,37 +89,57 @@ class _ManualEditScreenState extends State<ManualEditScreen> {
         child: ListView(
           padding: const EdgeInsets.all(AppDimensions.pagePadding),
           children: [
-            _Field(
-              controller: _nameCtrl,
-              label: tr(AppStrings.nameField),
-              required: true,
-              tr: tr,
+            FadeInCard(
+              delay: Duration.zero,
+              padding: EdgeInsets.zero,
+              child: _Field(
+                controller: _nameCtrl,
+                label: tr(AppStrings.nameField),
+                required: true,
+                tr: tr,
+              ),
             ),
             const SizedBox(height: AppDimensions.spaceMD),
-            _Field(
-              controller: _genericCtrl,
-              label: tr(AppStrings.genericField),
-              tr: tr,
+            FadeInCard(
+              delay: const Duration(milliseconds: 75),
+              padding: EdgeInsets.zero,
+              child: _Field(
+                controller: _genericCtrl,
+                label: tr(AppStrings.genericField),
+                tr: tr,
+              ),
             ),
             const SizedBox(height: AppDimensions.spaceMD),
-            _Field(
-              controller: _dosageCtrl,
-              label: tr(AppStrings.dosageField),
-              tr: tr,
+            FadeInCard(
+              delay: const Duration(milliseconds: 150),
+              padding: EdgeInsets.zero,
+              child: _Field(
+                controller: _dosageCtrl,
+                label: tr(AppStrings.dosageField),
+                tr: tr,
+              ),
             ),
             const SizedBox(height: AppDimensions.spaceMD),
-            _Field(
-              controller: _mfrCtrl,
-              label: tr(AppStrings.manufacturerField),
-              tr: tr,
+            FadeInCard(
+              delay: const Duration(milliseconds: 225),
+              padding: EdgeInsets.zero,
+              child: _Field(
+                controller: _mfrCtrl,
+                label: tr(AppStrings.manufacturerField),
+                tr: tr,
+              ),
             ),
             const SizedBox(height: AppDimensions.spaceXL),
             SizedBox(
               width: double.infinity,
               height: AppDimensions.buttonHeightLG,
-              child: ElevatedButton(
-                onPressed: _save,
-                child: Text(tr(AppStrings.save)),
+              child: FadeInCard(
+                delay: const Duration(milliseconds: 300),
+                padding: EdgeInsets.zero,
+                child: ElevatedButton(
+                  onPressed: _save,
+                  child: Text(tr(AppStrings.save)),
+                ),
               ),
             ),
           ],

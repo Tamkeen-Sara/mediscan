@@ -84,17 +84,18 @@ class AppTheme {
       textTheme: _textTheme(
           AppColors.textPrimaryLight, AppColors.textSecondaryLight),
 
-      // AppBar
+      // AppBar - Clean and modern
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.surfaceLight,
         foregroundColor: AppColors.textPrimaryLight,
-        elevation: AppDimensions.appBarElevation,
-        scrolledUnderElevation: 1,
+        elevation: 0.5,
+        scrolledUnderElevation: 0.5,
         centerTitle: false,
         titleTextStyle: GoogleFonts.roboto(
           fontSize: 20,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryLight,
+          letterSpacing: 0.3,
         ),
         systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
           statusBarColor: AppColors.transparent,
@@ -103,19 +104,19 @@ class AppTheme {
         iconTheme: const IconThemeData(color: AppColors.textPrimaryLight),
       ),
 
-      // Card
+      // Card - Modern and elegant
       cardTheme: CardThemeData(
         color: AppColors.surfaceLight,
-        elevation: AppDimensions.cardElevation,
+        elevation: 0.5,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(AppDimensions.radiusLG),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.dividerLight.withValues(alpha: 0.5), width: 0.8),
         ),
         shadowColor: AppColors.shadowLight,
       ),
 
-      // ElevatedButton
+      // ElevatedButton - Modern and sophisticated
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryBlue,
@@ -123,15 +124,16 @@ class AppTheme {
           minimumSize:
               const Size(double.infinity, AppDimensions.buttonHeightMD),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+            borderRadius: BorderRadius.circular(12),
           ),
-          elevation: 0,
+          elevation: 2,
+          shadowColor: AppColors.primaryBlue.withValues(alpha: 0.3),
           textStyle: GoogleFonts.roboto(
-              fontSize: 15, fontWeight: FontWeight.w600),
+              fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.5),
         ),
       ),
 
-      // OutlinedButton
+      // OutlinedButton - Refined
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primaryBlue,
@@ -141,26 +143,26 @@ class AppTheme {
               color: AppColors.primaryBlue,
               width: AppDimensions.buttonBorderWidth),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle: GoogleFonts.roboto(
-              fontSize: 15, fontWeight: FontWeight.w600),
+              fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.5),
         ),
       ),
 
-      // TextButton
+      // TextButton - Clean
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primaryBlue,
           textStyle: GoogleFonts.roboto(
-              fontSize: 14, fontWeight: FontWeight.w600),
+              fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.3),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       ),
 
-      // InputDecoration
+      // InputDecoration - Modern
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inputFillLight,
@@ -168,24 +170,24 @@ class AppTheme {
             horizontal: AppDimensions.spaceMD,
             vertical: AppDimensions.spaceMD),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          borderSide: const BorderSide(color: AppColors.inputBorderLight),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.inputBorderLight, width: 1.2),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          borderSide: const BorderSide(color: AppColors.inputBorderLight),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.inputBorderLight, width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(
               color: AppColors.inputFocusedBorderLight, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          borderSide: const BorderSide(color: AppColors.statusRed),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.statusRed, width: 1.2),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+          borderRadius: BorderRadius.circular(12),
           borderSide:
               const BorderSide(color: AppColors.statusRed, width: 2),
         ),
@@ -196,30 +198,30 @@ class AppTheme {
         labelStyle: GoogleFonts.roboto(
             fontSize: 14,
             color: AppColors.textSecondaryLight,
-            fontWeight: FontWeight.w400),
+            fontWeight: FontWeight.w500),
       ),
 
-      // BottomNavigationBar
+      // BottomNavigationBar - Modern
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.bottomNavLight,
-        selectedItemColor: AppColors.bottomNavSelectedLight,
-        unselectedItemColor: AppColors.bottomNavUnselectedLight,
-        elevation: 8,
+        selectedItemColor: AppColors.primaryBlue,
+        unselectedItemColor: AppColors.textHintLight,
+        elevation: 0.5,
         type: BottomNavigationBarType.fixed,
         showSelectedLabels: true,
         showUnselectedLabels: true,
       ),
 
-      // Chip
+      // Chip - Modern with refined edges
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.backgroundLight,
         selectedColor: AppColors.chipGreenTint,
         checkmarkColor: AppColors.chipGreen,
         labelStyle: GoogleFonts.roboto(
-            fontSize: 13, fontWeight: FontWeight.w500),
+            fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0.3),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-          side: const BorderSide(color: AppColors.dividerLight),
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.dividerLight, width: 1),
         ),
         padding: const EdgeInsets.symmetric(
             horizontal: AppDimensions.chipPaddingH,
@@ -276,17 +278,17 @@ class AppTheme {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return AppColors.primaryBlueLight;
+            return AppColors.primaryBlue.withValues(alpha: 0.3);
           }
           return AppColors.dividerLight;
         }),
       ),
 
-      // FloatingActionButton
+      // FloatingActionButton - Sophisticated
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.primaryBlue,
         foregroundColor: AppColors.white,
-        elevation: 4,
+        elevation: 3,
       ),
     );
   }
@@ -330,17 +332,18 @@ class AppTheme {
       textTheme: _textTheme(
           AppColors.textPrimaryDark, AppColors.textSecondaryDark),
 
-      // AppBar
+      // AppBar - Clean and modern
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimaryDark,
-        elevation: AppDimensions.appBarElevation,
-        scrolledUnderElevation: 1,
+        elevation: 0.5,
+        scrolledUnderElevation: 0.5,
         centerTitle: false,
         titleTextStyle: GoogleFonts.roboto(
           fontSize: 20,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: AppColors.textPrimaryDark,
+          letterSpacing: 0.3,
         ),
         systemOverlayStyle: SystemUiOverlayStyle.light.copyWith(
           statusBarColor: AppColors.transparent,
@@ -349,18 +352,19 @@ class AppTheme {
         iconTheme: const IconThemeData(color: AppColors.textPrimaryDark),
       ),
 
-      // Card
+      // Card - Modern and elegant
       cardTheme: CardThemeData(
         color: AppColors.surfaceDark,
-        elevation: 0,
+        elevation: 0.5,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusLG),
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: AppColors.dividerDark.withValues(alpha: 0.5), width: 0.8),
         ),
         shadowColor: AppColors.shadowDark,
       ),
 
-      // ElevatedButton
+      // ElevatedButton - Modern and sophisticated
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryBlueDark,
@@ -368,15 +372,16 @@ class AppTheme {
           minimumSize:
               const Size(double.infinity, AppDimensions.buttonHeightMD),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+            borderRadius: BorderRadius.circular(12),
           ),
-          elevation: 0,
+          elevation: 2,
+          shadowColor: AppColors.primaryBlueDark.withValues(alpha: 0.3),
           textStyle: GoogleFonts.roboto(
-              fontSize: 15, fontWeight: FontWeight.w600),
+              fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.5),
         ),
       ),
 
-      // OutlinedButton
+      // OutlinedButton - Refined
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primaryBlueDark,
@@ -386,26 +391,26 @@ class AppTheme {
               color: AppColors.primaryBlueDark,
               width: AppDimensions.buttonBorderWidth),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+            borderRadius: BorderRadius.circular(12),
           ),
           textStyle: GoogleFonts.roboto(
-              fontSize: 15, fontWeight: FontWeight.w600),
+              fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.5),
         ),
       ),
 
-      // TextButton
+      // TextButton - Clean
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primaryBlueDark,
           textStyle: GoogleFonts.roboto(
-              fontSize: 14, fontWeight: FontWeight.w600),
+              fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.3),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.radiusSM),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       ),
 
-      // InputDecoration
+      // InputDecoration - Modern
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inputFillDark,
@@ -413,24 +418,24 @@ class AppTheme {
             horizontal: AppDimensions.spaceMD,
             vertical: AppDimensions.spaceMD),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          borderSide: const BorderSide(color: AppColors.inputBorderDark),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.inputBorderDark, width: 1.2),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          borderSide: const BorderSide(color: AppColors.inputBorderDark),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.inputBorderDark, width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(
               color: AppColors.inputFocusedBorderDark, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
-          borderSide: const BorderSide(color: AppColors.statusRed),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.statusRed, width: 1.2),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMD),
+          borderRadius: BorderRadius.circular(12),
           borderSide:
               const BorderSide(color: AppColors.statusRed, width: 2),
         ),
@@ -441,21 +446,21 @@ class AppTheme {
         labelStyle: GoogleFonts.roboto(
             fontSize: 14,
             color: AppColors.textSecondaryDark,
-            fontWeight: FontWeight.w400),
+            fontWeight: FontWeight.w500),
       ),
 
-      // BottomNavigationBar
+      // BottomNavigationBar - Modern
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.bottomNavDark,
-        selectedItemColor: AppColors.bottomNavSelectedDark,
-        unselectedItemColor: AppColors.bottomNavUnselectedDark,
-        elevation: 0,
+        selectedItemColor: AppColors.primaryBlueDark,
+        unselectedItemColor: AppColors.textHintDark,
+        elevation: 0.5,
         type: BottomNavigationBarType.fixed,
         showSelectedLabels: true,
         showUnselectedLabels: true,
       ),
 
-      // Chip
+      // Chip - Modern with refined edges
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.surfaceDark,
         selectedColor: AppColors.chipGreenTintDark,
@@ -463,10 +468,11 @@ class AppTheme {
         labelStyle: GoogleFonts.roboto(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: AppColors.textPrimaryDark),
+            color: AppColors.textPrimaryDark,
+            letterSpacing: 0.3),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppDimensions.radiusFull),
-          side: const BorderSide(color: AppColors.dividerDark),
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.dividerDark, width: 1),
         ),
         padding: const EdgeInsets.symmetric(
             horizontal: AppDimensions.chipPaddingH,
@@ -513,7 +519,7 @@ class AppTheme {
         minLeadingWidth: 0,
       ),
 
-      // Switch
+      // Switch - Modern
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
@@ -523,17 +529,17 @@ class AppTheme {
         }),
         trackColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return AppColors.infoBlueTintDark;
+            return AppColors.primaryBlueDark.withValues(alpha: 0.3);
           }
           return AppColors.dividerDark;
         }),
       ),
 
-      // FloatingActionButton
+      // FloatingActionButton - Sophisticated
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: AppColors.primaryBlueDark,
         foregroundColor: AppColors.white,
-        elevation: 4,
+        elevation: 3,
       ),
     );
   }

@@ -7,6 +7,7 @@ import '../../constants/app_strings.dart';
 import '../../providers/preferences_provider.dart';
 import '../../providers/scan_provider.dart';
 import '../../services/translation_service.dart';
+import '../../utils/animation_utils.dart';
 
 class ProcessingScreen extends StatefulWidget {
   /// Null when the scan was triggered from manual text entry (no camera image).
@@ -177,65 +178,69 @@ class _ProcessingScreenState extends State<ProcessingScreen>
                   ),
                   const SizedBox(height: AppDimensions.spaceMD),
                   // Step indicators
-                  ..._steps.map((step) {
-                    final isCurrent = stepKey == step;
-                    final stepIndex = _steps.indexOf(step);
-                    final currentIndex = _steps.indexOf(stepKey);
-                    final isDone = stepIndex < currentIndex;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: AppDimensions.spaceXS),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(
-                                milliseconds: AppDimensions.animNormal),
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: isDone
-                                  ? AppColors.statusGreen
+                  StaggeredAnimationBuilder(
+                    staggerDelay: const Duration(milliseconds: 90),
+                    duration: const Duration(milliseconds: 320),
+                    children: _steps.map((step) {
+                      final isCurrent = stepKey == step;
+                      final stepIndex = _steps.indexOf(step);
+                      final currentIndex = _steps.indexOf(stepKey);
+                      final isDone = stepIndex < currentIndex;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: AppDimensions.spaceXS),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(
+                                  milliseconds: AppDimensions.animNormal),
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDone
+                                    ? AppColors.statusGreen
+                                    : isCurrent
+                                        ? AppColors.primaryBlue
+                                        : AppColors.dividerDark,
+                              ),
+                              child: isDone
+                                  ? const Icon(Icons.check,
+                                      size: 12, color: AppColors.white)
                                   : isCurrent
-                                      ? AppColors.primaryBlue
-                                      : AppColors.dividerDark,
+                                      ? const SizedBox(
+                                          width: 12,
+                                          height: 12,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.white,
+                                          ),
+                                        )
+                                      : null,
                             ),
-                            child: isDone
-                                ? const Icon(Icons.check,
-                                    size: 12, color: AppColors.white)
-                                : isCurrent
-                                    ? const SizedBox(
-                                        width: 12,
-                                        height: 12,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: AppColors.white,
-                                        ),
-                                      )
-                                    : null,
-                          ),
-                          const SizedBox(width: AppDimensions.spaceSM),
-                          Text(
-                            tr(step),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: isDone
-                                      ? AppColors.statusGreen
-                                      : isCurrent
-                                          ? AppColors.white
-                                          : AppColors.textHintDark,
-                                  fontWeight: isCurrent
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
+                            const SizedBox(width: AppDimensions.spaceSM),
+                            Text(
+                              tr(step),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: isDone
+                                        ? AppColors.statusGreen
+                                        : isCurrent
+                                            ? AppColors.white
+                                            : AppColors.textHintDark,
+                                    fontWeight: isCurrent
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ],
               ),
             ),

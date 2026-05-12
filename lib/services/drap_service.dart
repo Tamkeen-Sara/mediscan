@@ -28,6 +28,7 @@ class DrapService {
     final q = query.trim();
     if (q.isEmpty) return null;
     try {
+      AppLogger.info('DRAP search invoked — q=$q byGeneric=$byGeneric');
       final uri = Uri.parse(_baseUrl).replace(queryParameters: {
         byGeneric ? 'generic_name' : 'brand_name': q,
         'search': '1',
@@ -35,6 +36,7 @@ class DrapService {
       final response = await http
           .get(uri, headers: {'Accept': 'text/html'})
           .timeout(_timeout);
+      AppLogger.info('DRAP HTTP status ${response.statusCode} for q=$q');
       if (response.statusCode != 200) return null;
       return _parseHtml(response.body);
     } on TimeoutException {

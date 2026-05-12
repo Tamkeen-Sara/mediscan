@@ -8,6 +8,7 @@ import '../../models/medicine_model.dart';
 import '../../providers/scan_provider.dart';
 import '../../services/realtime_db_service.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 
 class SavedMedicinesScreen extends StatefulWidget {
   const SavedMedicinesScreen({super.key});
@@ -77,38 +78,42 @@ class _SavedMedicinesScreenState extends State<SavedMedicinesScreen> {
                   itemCount: _medicines.length,
                   itemBuilder: (ctx, i) {
                     final m = _medicines[i];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: AppDimensions.spaceSM),
-                      child: ListTile(
-                        leading: Container(
-                          width: AppDimensions.avatarSM * 2,
-                          height: AppDimensions.avatarSM * 2,
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? AppColors.infoBlueTintDark
-                                : AppColors.infoBlueTint,
-                            borderRadius:
-                                BorderRadius.circular(AppDimensions.radiusSM),
+                    return FadeInCard(
+                      delay: Duration(milliseconds: 70 * i),
+                      padding: EdgeInsets.zero,
+                      child: Card(
+                        margin: const EdgeInsets.only(bottom: AppDimensions.spaceSM),
+                        child: ListTile(
+                          leading: Container(
+                            width: AppDimensions.avatarSM * 2,
+                            height: AppDimensions.avatarSM * 2,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.infoBlueTintDark
+                                  : AppColors.infoBlueTint,
+                              borderRadius:
+                                  BorderRadius.circular(AppDimensions.radiusSM),
+                            ),
+                            child: const Icon(Icons.medication_outlined,
+                                color: AppColors.primaryBlue,
+                                size: AppDimensions.iconSM),
                           ),
-                          child: const Icon(Icons.medication_outlined,
-                              color: AppColors.primaryBlue,
-                              size: AppDimensions.iconSM),
+                          title: Text(m.displayName,
+                              style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: m.genericName.isNotEmpty
+                              ? Text(m.genericName)
+                              : null,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                color: AppColors.statusRed),
+                            onPressed: () => _confirmRemove(ctx, m, tr),
+                          ),
+                          onTap: () {
+                            ctx.read<ScanProvider>().setManualMedicine(m);
+                            Navigator.pushNamed(ctx, '/results',
+                                arguments: {'isInfoMode': true});
+                          },
                         ),
-                        title: Text(m.displayName,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: m.genericName.isNotEmpty
-                            ? Text(m.genericName)
-                            : null,
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              color: AppColors.statusRed),
-                          onPressed: () => _confirmRemove(ctx, m, tr),
-                        ),
-                        onTap: () {
-                          ctx.read<ScanProvider>().setManualMedicine(m);
-                          Navigator.pushNamed(ctx, '/results',
-                              arguments: {'isInfoMode': true});
-                        },
                       ),
                     );
                   },

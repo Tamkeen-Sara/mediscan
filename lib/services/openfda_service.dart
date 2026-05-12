@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/app_logger.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import '../models/medicine_model.dart';
@@ -15,6 +16,7 @@ class OpenFdaService {
   Future<MedicineModel?> searchMedicine(String query) async {
     if (query.trim().isEmpty) return null;
     try {
+      AppLogger.info('OpenFDA search invoked — q=$query');
       final uri = Uri.parse(_baseUrl).replace(queryParameters: {
         'search':
             'openfda.brand_name:"$query" OR openfda.generic_name:"$query"',
@@ -22,8 +24,10 @@ class OpenFdaService {
         if (_apiKey.isNotEmpty) 'api_key': _apiKey,
       });
 
+      AppLogger.info('OpenFDA URI: ${uri.toString()}');
       final response =
           await http.get(uri).timeout(const Duration(seconds: 10));
+      AppLogger.info('OpenFDA HTTP status ${response.statusCode} for q=$query');
       if (response.statusCode != 200) return null;
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;

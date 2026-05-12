@@ -51,6 +51,9 @@ class MedicineModel {
   // OpenFDA reference
   final String? openFdaId;
 
+  // Data source tracking (e.g., "Local Cache", "Firebase", "DRAP", "Gemini")
+  final String? source;
+
   const MedicineModel({
     required this.id,
     required this.brandName,
@@ -89,6 +92,7 @@ class MedicineModel {
     this.cachedSuggestedQuestions,
     this.cachedSuggestedQuestionsUr,
     this.openFdaId,
+    this.source,
   });
 
   factory MedicineModel.fromJson(Map<String, dynamic> json) {
@@ -132,6 +136,7 @@ class MedicineModel {
       cachedSuggestedQuestionsUr:
           _toNullableStringList(json['cachedSuggestedQuestionsUr']),
       openFdaId: json['openFdaId']?.toString(),
+      source: json['source']?.toString(),
     );
   }
 
@@ -218,6 +223,7 @@ class MedicineModel {
       if (cachedSuggestedQuestionsUr != null)
         'cachedSuggestedQuestionsUr': cachedSuggestedQuestionsUr,
       if (openFdaId != null) 'openFdaId': openFdaId,
+      if (source != null) 'source': source,
     };
   }
 
@@ -259,6 +265,7 @@ class MedicineModel {
     List<String>? cachedSuggestedQuestions,
     List<String>? cachedSuggestedQuestionsUr,
     String? openFdaId,
+    String? source,
   }) {
     return MedicineModel(
       id: id ?? this.id,
@@ -301,6 +308,7 @@ class MedicineModel {
       cachedSuggestedQuestionsUr:
           cachedSuggestedQuestionsUr ?? this.cachedSuggestedQuestionsUr,
       openFdaId: openFdaId ?? this.openFdaId,
+      source: source ?? this.source,
     );
   }
 

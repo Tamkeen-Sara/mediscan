@@ -5,6 +5,7 @@ import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
 import '../../services/realtime_db_service.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 
 class FeedbackScreen extends StatefulWidget {
   const FeedbackScreen({super.key});
@@ -50,50 +51,54 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       body: Padding(
         padding: const EdgeInsets.all(AppDimensions.pagePadding),
         child: _sent
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.check_circle,
-                        size: AppDimensions.iconXXL,
-                        color: AppColors.statusGreen),
-                    const SizedBox(height: AppDimensions.spaceMD),
-                    Text(tr(AppStrings.feedbackSent),
-                        style: Theme.of(context).textTheme.titleMedium),
-                  ],
+            ? FadeInCard(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle,
+                          size: AppDimensions.iconXXL,
+                          color: AppColors.statusGreen),
+                      const SizedBox(height: AppDimensions.spaceMD),
+                      Text(tr(AppStrings.feedbackSent),
+                          style: Theme.of(context).textTheme.titleMedium),
+                    ],
+                  ),
                 ),
               )
-            : Column(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _ctrl,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      decoration: InputDecoration(
-                        hintText: tr(AppStrings.feedbackHint),
-                        alignLabelWithHint: true,
+            : FadeInCard(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ctrl,
+                        maxLines: null,
+                        expands: true,
+                        textAlignVertical: TextAlignVertical.top,
+                        decoration: InputDecoration(
+                          hintText: tr(AppStrings.feedbackHint),
+                          alignLabelWithHint: true,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: AppDimensions.spaceMD),
-                  SizedBox(
-                    width: double.infinity,
-                    height: AppDimensions.buttonHeightLG,
-                    child: ElevatedButton(
-                      onPressed: _sending ? null : _send,
-                      child: _sending
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: AppColors.white),
-                            )
-                          : Text(tr(AppStrings.feedbackSend)),
+                    const SizedBox(height: AppDimensions.spaceMD),
+                    SizedBox(
+                      width: double.infinity,
+                      height: AppDimensions.buttonHeightLG,
+                      child: ElevatedButton(
+                        onPressed: _sending ? null : _send,
+                        child: _sending
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: AppColors.white),
+                              )
+                            : Text(tr(AppStrings.feedbackSend)),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
       ),
     );

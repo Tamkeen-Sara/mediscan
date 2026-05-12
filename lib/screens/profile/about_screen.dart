@@ -3,6 +3,7 @@ import '../../constants/app_colors.dart';
 import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -44,40 +45,40 @@ class AboutScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall),
           ),
           const SizedBox(height: AppDimensions.spaceLG),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppDimensions.cardPadding),
-              child: Text(tr(AppStrings.aboutDesc)),
+          FadeInCard(
+            delay: const Duration(milliseconds: 100),
+            child: Text(tr(AppStrings.aboutDesc)),
+          ),
+          const SizedBox(height: AppDimensions.spaceMD),
+          FadeInCard(
+            delay: const Duration(milliseconds: 180),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(tr(AppStrings.aboutDeveloper),
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: AppDimensions.spaceSM),
+                Text(tr(AppStrings.aboutDisclaimer),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        )),
+              ],
             ),
           ),
           const SizedBox(height: AppDimensions.spaceMD),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppDimensions.cardPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tr(AppStrings.aboutDeveloper),
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: AppDimensions.spaceSM),
-                  Text(tr(AppStrings.aboutDisclaimer),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontStyle: FontStyle.italic,
-                          )),
-                ],
+          FadeInCard(
+            delay: const Duration(milliseconds: 260),
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.description_outlined,
+                  color: AppColors.primaryBlue),
+              title: Text(tr(AppStrings.aboutLicenses)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => showLicensePage(
+                context: context,
+                applicationName: tr(AppStrings.appName),
+                applicationVersion: '1.0.0',
               ),
-            ),
-          ),
-          const SizedBox(height: AppDimensions.spaceMD),
-          ListTile(
-            leading: const Icon(Icons.description_outlined,
-                color: AppColors.primaryBlue),
-            title: Text(tr(AppStrings.aboutLicenses)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => showLicensePage(
-              context: context,
-              applicationName: tr(AppStrings.appName),
-              applicationVersion: '1.0.0',
             ),
           ),
         ],

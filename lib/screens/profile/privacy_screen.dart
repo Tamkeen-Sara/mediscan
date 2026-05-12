@@ -5,6 +5,7 @@ import '../../constants/app_dimensions.dart';
 import '../../constants/app_strings.dart';
 import '../../services/realtime_db_service.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 
 class PrivacyScreen extends StatelessWidget {
   const PrivacyScreen({super.key});
@@ -18,24 +19,30 @@ class PrivacyScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(AppDimensions.pagePadding),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(AppDimensions.cardPadding),
-              child: Text(tr(AppStrings.privacyDataUsage)),
-            ),
+          FadeInCard(
+            delay: const Duration(milliseconds: 80),
+            child: Text(tr(AppStrings.privacyDataUsage)),
           ),
           const SizedBox(height: AppDimensions.spaceLG),
-          ListTile(
-            leading: const Icon(Icons.delete_sweep_outlined,
-                color: AppColors.statusRed),
-            title: Text(tr(AppStrings.privacyDeleteAllData)),
-            onTap: () => _confirmDeleteData(context, tr),
+          FadeInCard(
+            delay: const Duration(milliseconds: 140),
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.delete_sweep_outlined,
+                  color: AppColors.statusRed),
+              title: Text(tr(AppStrings.privacyDeleteAllData)),
+              onTap: () => _confirmDeleteData(context, tr),
+            ),
           ),
-          ListTile(
-            leading:
-                const Icon(Icons.person_remove_outlined, color: AppColors.statusRed),
-            title: Text(tr(AppStrings.privacyDeleteAccount)),
-            onTap: () => _confirmDeleteAccount(context, tr),
+          FadeInCard(
+            delay: const Duration(milliseconds: 200),
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.person_remove_outlined,
+                  color: AppColors.statusRed),
+              title: Text(tr(AppStrings.privacyDeleteAccount)),
+              onTap: () => _confirmDeleteAccount(context, tr),
+            ),
           ),
         ],
       ),

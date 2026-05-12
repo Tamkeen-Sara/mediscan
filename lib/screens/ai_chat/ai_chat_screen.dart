@@ -7,6 +7,7 @@ import '../../providers/chat_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../providers/preferences_provider.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 import '../../widgets/chat_bubble.dart';
 import '../../widgets/typing_indicator.dart';
 import '../../widgets/offline_ai_banner.dart';
@@ -85,26 +86,38 @@ class _AiChatScreenState extends State<AiChatScreen> {
           // Context card + quick-fact chips when a medicine is loaded
           if (chat.hasContext && chat.contextMedicine != null) ...[
             const SizedBox(height: AppDimensions.spaceSM),
-            ScanContextCard(
-              medicineName: chat.contextMedicine!.displayName,
-              genericName: chat.contextMedicine!.genericName,
-              category: chat.contextMedicine!.category,
+            FadeInCard(
+              delay: const Duration(milliseconds: 80),
+              padding: EdgeInsets.zero,
+              child: ScanContextCard(
+                medicineName: chat.contextMedicine!.displayName,
+                genericName: chat.contextMedicine!.genericName,
+                category: chat.contextMedicine!.category,
+              ),
             ),
             const SizedBox(height: AppDimensions.spaceSM),
-            _QuickFactChips(
-              isDark: isDark,
-              onTap: (q) => _send(context, q),
+            FadeInCard(
+              delay: const Duration(milliseconds: 140),
+              padding: EdgeInsets.zero,
+              child: _QuickFactChips(
+                isDark: isDark,
+                onTap: (q) => _send(context, q),
+              ),
             ),
             const SizedBox(height: AppDimensions.spaceXS),
             // Suggested questions from the scanned medicine
             if (chat.contextMedicine!.cachedSuggestedQuestions?.isNotEmpty ==
                 true)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimensions.pagePadding),
-                child: SuggestedQuestionsCard(
-                  questions: chat.contextMedicine!.cachedSuggestedQuestions!,
-                  onQuestionTap: (q) => _send(context, q),
+              FadeInCard(
+                delay: const Duration(milliseconds: 190),
+                padding: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppDimensions.pagePadding),
+                  child: SuggestedQuestionsCard(
+                    questions: chat.contextMedicine!.cachedSuggestedQuestions!,
+                    onQuestionTap: (q) => _send(context, q),
+                  ),
                 ),
               ),
           ],
@@ -133,7 +146,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
                       }
                       final msg = chat.messages[i];
                       if (msg.isLoading) return const SizedBox.shrink();
-                      return Padding(
+                      return FadeInCard(
+                        delay: Duration(milliseconds: 50 * i),
                         padding: const EdgeInsets.only(
                             bottom: AppDimensions.spaceSM),
                         child: ChatBubble(message: msg),

@@ -9,6 +9,7 @@ import '../../constants/app_strings.dart';
 import '../../providers/preferences_provider.dart';
 import '../../providers/scan_provider.dart';
 import '../../services/translation_service.dart';
+import '../../widgets/animated_cards.dart';
 import '../../widgets/scan_overlay_painter.dart';
 
 class ScannerScreen extends StatefulWidget {
@@ -19,31 +20,81 @@ class ScannerScreen extends StatefulWidget {
 }
 
 class _ScannerScreenState extends State<ScannerScreen>
-    with SingleTickerProviderStateMixin {
+  with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulse;
 
   CameraController? _camCtrl;
   bool _camReady = false;
   bool _capturing = false;
+  bool _cameraPermissionDenied = false;
+  String _cameraStatusMessage = 'Starting camera preview...';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _pulseCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 1500));
     _pulse = Tween(begin: 0.6, end: 1.0).animate(
         CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
     _pulseCtrl.repeat(reverse: true);
-    _initCamera();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initCamera();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _camCtrl?.dispose();
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _initCamera();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _releaseCamera();
+    }
   }
 
   Future<void> _initCamera() async {
+    final oldCtrl = _camCtrl;
+    if (oldCtrl != null) {
+      oldCtrl.removeListener(_onCameraValue);
+      await oldCtrl.dispose();
+      _camCtrl = null;
+    }
+
+    if (mounted) {
+      setState(() {
+        _camReady = false;
+        _cameraPermissionDenied = false;
+        _cameraStatusMessage = 'Starting camera preview...';
+      });
+    }
+
     try {
       final cameras = await availableCameras();
-      if (cameras.isEmpty) return;
+      if (cameras.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _cameraStatusMessage = 'No camera available on this device.';
+          });
+        }
+        return;
+      }
+      final backCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
       final ctrl = CameraController(
-        cameras.first,
+        backCamera,
         // medium = 720×480 for preview — enough for live view, far less GPU
         // pressure than high (1280×720) which caused cascading buffer drops.
         ResolutionPreset.medium,
@@ -63,8 +114,31 @@ class _ScannerScreenState extends State<ScannerScreen>
       setState(() {
         _camCtrl = ctrl;
         _camReady = true;
+        _cameraPermissionDenied = false;
+        _cameraStatusMessage = '';
       });
-    } catch (_) {}
+    } on CameraException catch (e) {
+      debugPrint('Scanner camera init failed: ${e.code} ${e.description}');
+      final denied = e.code.toLowerCase().contains('accessdenied');
+      if (mounted) {
+        setState(() {
+          _camReady = false;
+          _cameraPermissionDenied = denied;
+          _cameraStatusMessage = denied
+              ? 'Camera permission required'
+              : 'Unable to start camera preview.';
+        });
+      }
+    } catch (e) {
+      debugPrint('Scanner camera init failed: $e');
+      if (mounted) {
+        setState(() {
+          _camReady = false;
+          _cameraPermissionDenied = false;
+          _cameraStatusMessage = 'Unable to start camera preview.';
+        });
+      }
+    }
   }
 
   void _onCameraValue() {
@@ -90,50 +164,36 @@ class _ScannerScreenState extends State<ScannerScreen>
     }
   }
 
-  @override
-  void dispose() {
-    _camCtrl?.dispose();
-    _pulseCtrl.dispose();
-    super.dispose();
-  }
-
   Future<void> _takePhoto() async {
     if (_capturing) return;
     setState(() => _capturing = true);
 
-    if (_camReady && _camCtrl != null) {
-      try {
-        final file = await _camCtrl!.takePicture();
-        await _releaseCamera();
-        if (!mounted) return;
-        await Navigator.pushNamed(context, '/processing', arguments: file.path);
-        if (mounted) {
-          setState(() => _capturing = false);
-          _initCamera();
-        }
-        return;
-      } catch (_) {
-        await _releaseCamera();
+    if (!_camReady || _camCtrl == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Camera preview is not ready yet.')),
+        );
       }
+      await _initCamera();
+      if (mounted) setState(() => _capturing = false);
+      return;
     }
 
-    final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 90,
-    );
-    if (file == null) {
+    try {
+      final file = await _camCtrl!.takePicture();
+      await _releaseCamera();
+      if (!mounted) return;
+      await Navigator.pushNamed(context, '/processing', arguments: file.path);
       if (mounted) {
         setState(() => _capturing = false);
         _initCamera();
       }
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.pushNamed(context, '/processing', arguments: file.path);
-    if (mounted) {
-      setState(() => _capturing = false);
-      _initCamera();
+    } catch (_) {
+      await _releaseCamera();
+      if (mounted) {
+        setState(() => _capturing = false);
+      }
+      await _initCamera();
     }
   }
 
@@ -270,7 +330,43 @@ class _ScannerScreenState extends State<ScannerScreen>
                 if (_camReady && _camCtrl != null)
                   ClipRect(child: CameraPreview(_camCtrl!))
                 else
-                  Container(color: AppColors.black),
+                  Container(
+                    color: AppColors.black,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!_cameraPermissionDenied)
+                            const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.white,
+                              ),
+                            )
+                          else
+                            Icon(
+                              Icons.camera_alt_outlined,
+                              color: AppColors.white.withValues(alpha: 0.75),
+                              size: 40,
+                            ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _cameraStatusMessage,
+                            style: TextStyle(
+                              color: AppColors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: _initCamera,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 AnimatedBuilder(
                   animation: _pulse,
@@ -311,136 +407,77 @@ class _ScannerScreenState extends State<ScannerScreen>
           ),
 
           // ── Bottom controls ──────────────────────────────────────────────
-          Container(
-            color: AppColors.black,
-            padding: const EdgeInsets.symmetric(vertical: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _ControlButton(
-                  icon: Icons.photo_library_outlined,
-                  label: tr(AppStrings.galleryButton),
-                  isDark: isDark,
-                  onPressed: _capturing ? null : _pickFromGallery,
-                ),
-
-                // Shutter
-                GestureDetector(
-                  onTap: _capturing ? null : _takePhoto,
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border:
-                          Border.all(color: AppColors.white, width: 3),
-                      color: _capturing
-                          ? AppColors.white.withValues(alpha: 0.05)
-                          : AppColors.white.withValues(alpha: 0.15),
-                    ),
-                    child: _capturing
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.white),
+                Container(
+                  color: AppColors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 6, horizontal: AppDimensions.spaceXS),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: FadeSlideIn(
+                          delay: Duration.zero,
+                          child: _ControlButton(
+                            icon: Icons.photo_library_outlined,
+                            label: tr(AppStrings.galleryButton),
+                            isDark: isDark,
+                            onPressed: _capturing ? null : _pickFromGallery,
+                            compact: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppDimensions.spaceSM),
+                      FadeSlideIn(
+                        delay: const Duration(milliseconds: 75),
+                        child: GestureDetector(
+                          onTap: _capturing ? null : _takePhoto,
+                          child: Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.white, width: 3),
+                              color: _capturing
+                                  ? AppColors.white.withValues(alpha: 0.05)
+                                  : AppColors.white.withValues(alpha: 0.15),
                             ),
-                          )
-                        : const Icon(Icons.camera_alt,
-                            color: AppColors.white, size: 34),
+                            child: Center(
+                              child: _capturing
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2, color: AppColors.white),
+                                    )
+                                  : const Icon(Icons.camera_alt,
+                                      color: AppColors.white, size: 28),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppDimensions.spaceSM),
+                      Expanded(
+                        flex: 1,
+                        child: FadeSlideIn(
+                          delay: const Duration(milliseconds: 150),
+                          child: _ControlButton(
+                            icon: Icons.keyboard_outlined,
+                            label: 'Type',
+                            isDark: isDark,
+                            onPressed: _capturing ? null : () => _showManualEntry(context),
+                            compact: true,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-
-                _ControlButton(
-                  icon: Icons.keyboard_outlined,
-                  label: 'Type',
-                  isDark: isDark,
-                  onPressed: _capturing
-                      ? null
-                      : () => _showManualEntry(context),
                 ),
               ],
-            ),
-          ),
-
-          // ── "What Do I Have?" symptom checker entry card ─────────────────
-          Container(
-            color: isDark ? AppColors.surfaceDark : AppColors.backgroundLight,
-            padding: const EdgeInsets.fromLTRB(
-                AppDimensions.pagePadding, 0,
-                AppDimensions.pagePadding, AppDimensions.spaceMD),
-            child: InkWell(
-              onTap: () => Navigator.pushNamed(context, '/symptom-checker'),
-              borderRadius:
-                  BorderRadius.circular(AppDimensions.radiusMD),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppDimensions.spaceMD,
-                    vertical: AppDimensions.spaceSM + 2),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.surfaceElevatedDark
-                      : AppColors.surfaceLight,
-                  borderRadius:
-                      BorderRadius.circular(AppDimensions.radiusMD),
-                  border: const Border(
-                    left: BorderSide(
-                        color: AppColors.chipGreen, width: 4),
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: AppColors.shadowLight,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tr(AppStrings.whatDoIHave),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            tr(AppStrings.pointAtMedicine),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondaryLight,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppDimensions.spaceSM),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.chipGreen.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.health_and_safety_outlined,
-                        color: AppColors.chipGreen,
-                        size: 26,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ),
           ),
         ],
@@ -454,12 +491,14 @@ class _ControlButton extends StatelessWidget {
   final String label;
   final bool isDark;
   final VoidCallback? onPressed;
+  final bool compact;
 
   const _ControlButton({
     required this.icon,
     required this.label,
     required this.isDark,
     required this.onPressed,
+    this.compact = false,
   });
 
   @override
@@ -469,12 +508,20 @@ class _ControlButton extends StatelessWidget {
         backgroundColor:
             isDark ? AppColors.surfaceElevatedDark : AppColors.surfaceLight,
         foregroundColor: AppColors.primaryBlue,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+         padding: EdgeInsets.symmetric(
+           horizontal: compact ? 12 : 20,
+           vertical: compact ? 10 : 14,
+         ),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      icon: Icon(icon),
-      label: Text(label),
+      icon: Icon(icon, size: compact ? 18 : 20),
+      label: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall,
+      ),
       onPressed: onPressed,
     );
   }

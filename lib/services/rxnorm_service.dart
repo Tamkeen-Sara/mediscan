@@ -22,8 +22,10 @@ class RxNormService {
     final q = query.trim();
     if (q.isEmpty) return null;
     try {
+      AppLogger.info('RxNorm search invoked — q=$q');
       // Step 1: find RxCUI (concept identifier) for the drug name
       final rxcui = await _getRxcui(q);
+      AppLogger.info('RxNorm _getRxcui returned rxcui=$rxcui for q=$q');
       if (rxcui == null) return null;
 
       // Step 2: fetch the full drug properties for that RxCUI
@@ -36,10 +38,12 @@ class RxNormService {
 
   Future<String?> _getRxcui(String name) async {
     try {
+      AppLogger.info('RxNorm _getRxcui lookup — name=$name');
       final uri = Uri.parse('$_base/rxcui.json')
           .replace(queryParameters: {'name': name, 'search': '1'});
       final res =
           await http.get(uri).timeout(_timeout);
+      AppLogger.info('RxNorm rxcui HTTP status ${res.statusCode} for name=$name');
       if (res.statusCode != 200) return null;
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final idGroup = body['idGroup'] as Map<String, dynamic>?;

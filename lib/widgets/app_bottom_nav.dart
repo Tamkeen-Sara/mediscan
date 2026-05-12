@@ -41,6 +41,16 @@ class AppBottomNav extends StatelessWidget {
           activeIcon: const Icon(Icons.document_scanner),
           label: tr(AppStrings.tabScanner),
         ),
+        const BottomNavigationBarItem(
+          icon: Icon(Icons.description_outlined),
+          activeIcon: Icon(Icons.description),
+          label: 'Prescription',
+        ),
+        BottomNavigationBarItem(
+          icon: const Icon(Icons.health_and_safety_outlined),
+          activeIcon: const Icon(Icons.health_and_safety),
+          label: tr(AppStrings.whatDoIHave),
+        ),
         BottomNavigationBarItem(
           icon: const Icon(Icons.history_outlined),
           activeIcon: const Icon(Icons.history),

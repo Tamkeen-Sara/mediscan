@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/medicine_model.dart';
 import '../models/identification_result.dart';
@@ -101,6 +102,7 @@ class ScanProvider extends ChangeNotifier {
     required List<String> tokens,
     bool autoSummarise = true,
   }) async {
+    debugPrint('[SCAN] pipeline start | rawLen=${rawText.length} | tokens=${tokens.length} | firstLine=${rawText.split('\n').first}');
     _processingStep = 'identifying_medicine';
     notifyListeners();
     final identResult = await MedicineIdentifier.instance.identify(
@@ -108,7 +110,10 @@ class ScanProvider extends ChangeNotifier {
       tokens: tokens,
     );
 
+    debugPrint('[SCAN] ident result | failed=${identResult.isFailed} | source=${identResult.source} | name=${identResult.medicine.displayName} | score=${identResult.overallScore}');
+
     if (identResult.isFailed) {
+      debugPrint('[SCAN] pipeline failed at identify step');
       _phase = ScanPhase.failed;
       notifyListeners();
       return;
@@ -120,11 +125,16 @@ class ScanProvider extends ChangeNotifier {
       _processingStep = 'generating_summary';
       notifyListeners();
       try {
+        debugPrint('[SCAN] calling Gemini summary | medicine=${identResult.medicine.displayName} | source=${identResult.source} | cached=${identResult.medicine.cachedSummaryEn?.isNotEmpty == true}');
         _summaryResult = await GeminiService.instance
             .generateMedicineSummary(identResult.medicine);
+        debugPrint('[SCAN] summary generated=${_summaryResult != null} | medicine=${identResult.medicine.displayName} | hasApiResult=${_summaryResult != null && _summaryResult!.summaryEn.isNotEmpty}');
       } catch (e) {
         AppLogger.warning('Gemini summary skipped', error: e);
+        debugPrint('[SCAN] summary error=$e');
       }
+    } else {
+      debugPrint('[SCAN] autoSummarise disabled; Gemini summary not called | medicine=${identResult.medicine.displayName}');
     }
 
     _processingStep = 'almost_done';
@@ -139,7 +149,11 @@ class ScanProvider extends ChangeNotifier {
 
   Future<void> _saveToHistory(IdentificationResult identResult) async {
     try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
+      var uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        final cred = await FirebaseAuth.instance.signInAnonymously();
+        uid = cred.user?.uid;
+      }
       if (uid == null) return;
       final historyItem = ScanHistoryModel(
         id: '',
@@ -197,9 +211,24 @@ class ScanProvider extends ChangeNotifier {
       rawOcrText: '',
       extractedTokens: [],
     );
+    _summaryResult = null;  // Clear cached summary from previous scan
     _phase = ScanPhase.result;
     _isSaved = false;
     notifyListeners();
+  }
+
+  /// Generate summary for the current medicine (used when viewing details from symptom checker)
+  Future<void> generateSummaryForCurrentMedicine() async {
+    if (_result?.medicine == null) return;
+    try {
+      _summaryResult = await GeminiService.instance
+          .generateMedicineSummary(_result!.medicine);
+      notifyListeners();
+      debugPrint('[SCAN] summary generated for manual medicine=${_summaryResult != null}');
+    } catch (e) {
+      AppLogger.warning('Gemini summary failed for manual medicine', error: e);
+      debugPrint('[SCAN] summary error=$e');
+    }
   }
 
   void reset() {
